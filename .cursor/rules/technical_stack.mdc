@@ -1,0 +1,109 @@
+---
+description: 技术栈文档
+globs: 
+alwaysApply: false
+---
+# 技术栈文档 - Gemini 内容导出与美化插件
+
+**1. 引言**
+
+本文档详细说明了为"Gemini 内容导出与美化插件"项目确定的技术栈。该选择旨在平衡开发效率、性能、可维护性、社区支持以及与目标浏览器（Chrome, Edge）的兼容性，并深度整合 `markdown-to-image` ([https://github.com/gcui-art/markdown-to-image](mdc:https:/github.com/gcui-art/markdown-to-image)) 项目的优势。
+
+**2. 核心前端技术**
+
+*   **HTML5 (HyperText Markup Language 5)**
+    *   **用途**: 构建插件所有用户界面的结构，包括注入到 Gemini 页面的按钮、弹出菜单以及海报编辑器的 Web UI。
+    *   **理由**: Web 开发的基石，所有浏览器原生支持。
+*   **CSS3 (Cascading Style Sheets 3)**
+    *   **用途**: 负责插件所有 UI 元素的样式和布局。
+        *   对于**海报编辑器 Web UI**，将采用 **Tailwind CSS** 以便与 `markdown-to-image` 项目的实践保持一致，并利用其高效的原子化 CSS 开发模式。
+        *   对于插件注入的简单 UI 元素（如按钮），可使用原生 CSS 或同样采用 Tailwind CSS 以求风格统一。
+    *   **理由**: Web 开发的标准样式语言。Tailwind CSS 提供快速 UI 构建能力。
+*   **TypeScript (基于 ECMAScript 2015+ / ES6+)**
+    *   **用途**: 作为主要的编程语言，在 JavaScript 基础上增加静态类型检查。用于实现插件的所有动态行为和逻辑，包括 DOM 操作、浏览器 API 交互、事件处理、Markdown 与图片转换逻辑调用、海报编辑器交互功能等。
+    *   **理由**: 提高代码质量、可维护性和可重构性，减少运行时错误。`markdown-to-image` 项目也使用了 TypeScript，保持一致性。
+
+**3. 浏览器扩展框架与 API**
+
+*   **Manifest V3**
+    *   **用途**: Chrome 和 Edge 扩展的最新标准清单文件。定义插件的元数据、权限、后台逻辑 (Service Worker)、内容脚本等。
+    *   **理由**: Google 推荐的最新标准，具有更好的安全性、性能和隐私特性。
+*   **Content Scripts**
+    *   **用途**: TypeScript 文件，运行在特定网页（即 Gemini 对话页面）的上下文中。用于识别内容、注入 UI、提取内容，并与 Service Worker 或 Popup 通信。
+    *   **理由**: Manifest V3 的核心部分，用于与网页内容直接交互。
+*   **Service Worker (替代 Background Scripts in Manifest V3)**
+    *   **用途**: 在插件后台处理事件和消息。
+    *   **理由**: Manifest V3 的要求，更节省资源。
+*   **Popup (Browser Action / Page Action)**
+    *   **用途**: (可选，根据需求文档 3.4.2) 用户点击浏览器工具栏上的插件图标时显示的 HTML 页面。
+    *   **理由**: 提供便捷的用户交互入口。
+*   **Storage API (`chrome.storage`)**
+    *   **用途**: 存储用户偏好设置。
+    *   **理由**: 浏览器插件提供的持久化存储机制。
+
+**4. 核心功能实现库与框架**
+
+*   **4.1. HTML/DOM 到图片转换**
+    *   **选定库**: `html2canvas`
+        *   **用途**: 将 Gemini 页面的选定内容 (DOM 元素) 或 Web UI 编辑器中的预览内容渲染成 Canvas，然后导出为图片 (PNG/JPEG)。
+        *   **理由**: 较为成熟和广泛使用的客户端 HTML 到 Canvas 渲染库。
+
+*   **4.2. HTML 到 Markdown 转换**
+    *   **选定库**: `Turndown`
+        *   **用途**: 将从 Gemini 页面捕获的 HTML 内容转换为 Markdown 文本。
+        *   **理由**: 流行且功能强大的 HTML 到 Markdown 转换库，支持 GFM 和自定义规则。
+
+*   **4.3. Markdown 到图片海报 (Web UI 编辑器核心)**
+    *   **核心技术方案**: 基于 `markdown-to-image` (GitHub: `gcui-art/markdown-to-image` - [https://github.com/gcui-art/markdown-to-image](mdc:https:/github.com/gcui-art/markdown-to-image))
+        *   **用途**: 利用其提供的 React 组件 (`Md2Poster`) 将 Markdown 渲染为美观的海报图片，并参考其 Web 编辑器实现自定义编辑功能。
+        *   **理由**: 直接命中了需求的核心，其提供的 React 组件和 Web 编辑器示例是实现此功能的最佳基础。
+        *   **集成方式**: 直接集成其 React 组件，并根据本项目需求进行定制开发和功能扩展。
+
+*   **4.4. Web UI 编辑器技术栈**
+    *   **选定框架**: **React**
+        *   **用途**: 构建海报编辑器的用户界面。
+        *   **理由**: 最大化复用 `markdown-to-image` ([https://github.com/gcui-art/markdown-to-image](mdc:https:/github.com/gcui-art/markdown-to-image)) 项目的 React 组件 (`Md2Poster`)，减少重复开发，快速实现核心海报生成与编辑功能。
+        *   **备选 (轻量化)**: **Preact** (React API 兼容) 可以在项目后期对包体积有极致要求时考虑替换，开发初期以 React 为主。
+
+**5. 构建与开发工具**
+
+*   **包管理器**:
+    *   **选定工具**: `pnpm`
+    *   **用途**: 管理项目依赖。
+    *   **理由**: 在磁盘空间和安装速度上有优势。`markdown-to-image` 项目也使用了 `pnpm`，保持一致性。
+*   **构建/打包工具**:
+    *   **选定工具**: `Vite`
+        *   **用途**: 现代前端构建工具，提供极速的冷启动、即时模块热更新 (HMR) 和优化的构建输出。
+        *   **理由**: 开发体验极佳，与 React 集成良好，对 TypeScript 原生支持。`markdown-to-image` 项目也使用了 `Vite`，保持一致性。
+*   **代码检查与格式化**:
+    *   `ESLint`:
+        *   **用途**: TypeScript 代码静态分析。
+        *   **理由**: 行业标准，高度可配置。
+    *   `Prettier`:
+        *   **用途**: 自动化代码格式化。
+        *   **理由**: 广泛使用，与 ESLint 集成良好。
+*   **版本控制**:
+    *   `Git`
+    *   **用途**: 代码版本管理与协作。
+    *   **理由**: 分布式版本控制系统的行业标准。
+    *   **托管平台**: `GitHub` (或其他类似平台)。
+
+**6. 浏览器兼容性**
+
+*   **主要目标**:
+    *   最新版本的 Google Chrome。
+    *   最新版本的 Microsoft Edge (基于 Chromium)。
+*   **策略**: 使用 Manifest V3 标准，利用 Vite 进行现代 JavaScript 构建，并在目标浏览器上进行充分测试。
+
+**7. 总结**
+
+本技术栈明确了以下核心选择：
+
+*   **语言**: TypeScript
+*   **UI 框架 (编辑器)**: React (优先考虑集成 `markdown-to-image` 组件)
+*   **CSS (编辑器)**: Tailwind CSS
+*   **核心库**: `html2canvas` (DOM 转图), `Turndown` (HTML 转 MD), `markdown-to-image` (MD 转海报核心)
+*   **构建工具链**: Vite + pnpm
+*   **浏览器扩展标准**: Manifest V3
+
+此选型旨在最大化利用现有优秀开源项目 (`markdown-to-image`)，并结合现代前端开发实践，高效构建高质量的浏览器插件。

@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Export Enhancer",
+  "version": "0.1.0",
+  "description": "Export Gemini conversations to Markdown or customizable image posters.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "clipboardWrite",
+    "downloads"
+  ],
+  "host_permissions": [
+    "*://gemini.google.com/*"
+  ],
+  "action": {
+    "default_title": "Gemini Export Enhancer",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icon16.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://gemini.google.com/*"],
+      "js": ["js/content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/*",
+        "js/editor.js",
+        "css/editor.css"
+      ],
+      "matches": ["*://gemini.google.com/*"]
+    }
+  ]
+} 
