@@ -3,8 +3,31 @@
 // import ExportMenu from './components/ExportMenu'; // Component might be used later, or its parts
 import { GEMINI_SELECTORS } from './selectors';
 import { htmlToMarkdown } from '../core/markdownConverter';
+import { generateImageBlob } from '../core/imageGenerator';
 
 console.log("Gemini Export Enhancer: Script start. Mode: Inject into Share Menu.");
+
+// Helper function to trigger download
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const downloadLink = document.createElement('a');
+  downloadLink.href = url;
+  downloadLink.download = filename;
+
+  document.body.appendChild(downloadLink);
+  try {
+    downloadLink.click();
+    console.log(`Download triggered for ${filename}`);
+  } catch (e) {
+    console.error('Error triggering download click:', e);
+    // Fallback or inform user
+    alert('自动下载失败，请检查浏览器设置或手动操作。');
+  }
+  document.body.removeChild(downloadLink);
+
+  // Revoke the object URL after a delay
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
 
 function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLElement) {
   if (shareMenuPanel.querySelector('.gemini-enhancer-custom-item')) {
@@ -198,15 +221,116 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
       }
     },
     { 
-      label: '导出为图片 (自定义)', 
-      action: (blockRoot: HTMLElement) => { 
-        console.log('Action started: Export Image for block:', blockRoot);
-        const contentElement = blockRoot.querySelector(GEMINI_SELECTORS.answerContent);
+      label: '复制为图片 (自定义)',
+      action: async (blockRoot: HTMLElement) => {
+        console.log('Action started: Copy Image for block:', blockRoot);
+        
+        // Find content element using selectors
+        let contentElement = blockRoot.querySelector(GEMINI_SELECTORS.answerContent);
+        if (!contentElement) {
+          console.log('DEBUG: Copy Image - Main selector failed, trying fallbacks...');
+          for (const fallbackSelector of GEMINI_SELECTORS.answerContentFallbacks) {
+            contentElement = blockRoot.querySelector(fallbackSelector);
+            if (contentElement) {
+              console.log('DEBUG: Copy Image - Fallback selector success:', fallbackSelector);
+              break;
+            }
+          }
+        }
+        
+        console.log('DEBUG: Copy Image - Final content element:', contentElement);
+
         if (contentElement) {
-          console.log('  Content HTML found for Export Image:', contentElement.innerHTML);
-          // TODO: Trigger modal editor UI, passing content HTML
+          console.log('  Content element found for Copy Image.');
+          try {
+            // Generate image blob
+            const blob = await generateImageBlob(contentElement as HTMLElement);
+            
+            if (blob) {
+              console.log('  Image blob generated successfully. Size:', blob.size);
+              // Copy blob to clipboard
+              try {
+                await navigator.clipboard.write([
+                  new ClipboardItem({ 'image/png': blob })
+                ]);
+                console.log('Success: Image copied to clipboard!');
+                // TODO: Show success Toast notification
+              } catch (clipboardError) {
+                console.error('Error writing image to clipboard:', clipboardError);
+                alert('无法将图片复制到剪贴板：' + (clipboardError instanceof Error ? clipboardError.message : String(clipboardError)));
+                // TODO: Show error Toast notification (clipboard write failed)
+              }
+            } else {
+              console.error('  Image blob generation failed (returned null).');
+              alert('图片生成失败。');
+              // TODO: Show error Toast notification (image generation failed)
+            }
+          } catch (error) {
+            console.error('Error during image generation or processing:', error);
+            alert('图片处理过程中出错：' + (error instanceof Error ? error.message : String(error)));
+            // TODO: Show error Toast notification (general image error)
+          }
         } else {
-          console.error('  Could not find content element for Export Image using selector:', GEMINI_SELECTORS.answerContent);
+          console.error('  Could not find content element for Copy Image using any selector');
+          console.log('  Inspect blockRoot HTML:', blockRoot.innerHTML.substring(0, 300), '...');
+          alert('找不到内容元素，无法复制图片。请检查控制台获取详情。');
+          // TODO: Show error Toast notification (content not found)
+        }
+      }
+    },
+    { 
+      label: '下载为图片 (自定义)',
+      action: async (blockRoot: HTMLElement) => {
+        console.log('Action started: Download Image for block:', blockRoot);
+        
+        // Find content element using selectors
+        let contentElement = blockRoot.querySelector(GEMINI_SELECTORS.answerContent);
+        if (!contentElement) {
+          console.log('DEBUG: Download Image - Main selector failed, trying fallbacks...');
+          for (const fallbackSelector of GEMINI_SELECTORS.answerContentFallbacks) {
+            contentElement = blockRoot.querySelector(fallbackSelector);
+            if (contentElement) {
+              console.log('DEBUG: Download Image - Fallback selector success:', fallbackSelector);
+              break;
+            }
+          }
+        }
+        
+        console.log('DEBUG: Download Image - Final content element:', contentElement);
+
+        if (contentElement) {
+          console.log('  Content element found for Download Image.');
+          try {
+            // Generate image blob
+            const blob = await generateImageBlob(contentElement as HTMLElement);
+            
+            if (blob) {
+              console.log('  Image blob generated successfully. Size:', blob.size);
+              // Trigger download
+              const date = new Date();
+              const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+              const formattedTime = `${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}`;
+              const filename = `Gemini-Export-${formattedDate}_${formattedTime}.png`;
+              
+              triggerDownload(blob, filename);
+              console.log('Success: Image download initiated!');
+              // TODO: Show success/download started Toast notification
+              
+            } else {
+              console.error('  Image blob generation failed (returned null).');
+              alert('图片生成失败。');
+              // TODO: Show error Toast notification (image generation failed)
+            }
+          } catch (error) {
+            console.error('Error during image generation or download triggering:', error);
+            alert('图片处理或下载过程中出错：' + (error instanceof Error ? error.message : String(error)));
+            // TODO: Show error Toast notification (general image error)
+          }
+        } else {
+          console.error('  Could not find content element for Download Image using any selector');
+          console.log('  Inspect blockRoot HTML:', blockRoot.innerHTML.substring(0, 300), '...');
+          alert('找不到内容元素，无法下载图片。请检查控制台获取详情。');
+          // TODO: Show error Toast notification (content not found)
         }
       }
     },

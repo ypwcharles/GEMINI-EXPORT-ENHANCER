@@ -33,7 +33,7 @@ alwaysApply: true
     *   验证: 依赖已正确添加到 `package.json` 的 `devDependencies` 中，并且 `pnpm-lock.yaml` 文件已生成/更新。
 *   [x] **步骤 0.4: 安装核心运行时依赖**
     *   任务:
-        *   [x] 运行 `pnpm add react react-dom html2canvas turndown markdown-to-image`。
+        *   [x] 运行 `pnpm add react react-dom html2canvas turndown`。
     *   验证: 依赖已正确添加到 `package.json` 的 `dependencies` 中。
 *   [x] **步骤 0.5: 配置 TypeScript (`tsconfig.json`)**
     *   任务:
@@ -92,7 +92,6 @@ alwaysApply: true
             rollupOptions: {
               input: {
                 content: resolve(__dirname, 'src/content/content.ts'),
-                // editor: resolve(__dirname, 'src/editor/main.tsx'), // Example: if editor is a separate page bundle
                 // popup: resolve(__dirname, 'src/popup/popup.html'), // Example: if using a popup
               },
               output: {
@@ -192,7 +191,7 @@ alwaysApply: true
     *   验证: 配置文件创建完毕。
 *   [x] **步骤 0.9: 创建 `src` 目录结构**
     *   任务:
-        *   [x] 在 `src` 目录下创建以下子目录：`content`, `core`, `editor` (内含 `components`, `hooks`, `styles`, `utils`), `ui_components`, `assets`。
+        *   [x] 在 `src` 目录下创建以下子目录：`content`, `core`, `ui_components`, `assets`。
         *   [ ] (可选) 创建 `background` 和 `popup` 目录。
     *   `src` 目录结构规划:
         ```
@@ -205,14 +204,7 @@ alwaysApply: true
         ├── core/               # Core non-UI logic
         │   ├── markdownConverter.ts
         │   └── imageGenerator.ts
-        ├── editor/             # Poster editor UI (React app)
-        │   ├── components/     # Editor-specific React components
-        │   ├── hooks/          # Custom React hooks for editor
-        │   ├── styles/         # CSS/Tailwind for editor components if not co-located
-        │   ├── utils/          # Utility functions for editor
-        │   ├── EditorApp.tsx   # Main application component for the editor modal
-        │   └── main.tsx        # Entry point for editor React app (if rendered separately)
-        ├── ui_components/      # Common reusable React UI components (Modal, Button, Toast etc.)
+        ├── ui_components/      # Common reusable React UI components (Button, Toast etc.)
         ├── index.css           # Main CSS file with Tailwind directives
         └── (optional) background/ # Service worker logic
             └── background.ts
@@ -233,11 +225,12 @@ alwaysApply: true
           "manifest_version": 3,
           "name": "Gemini Export Enhancer",
           "version": "0.1.0",
-          "description": "Export Gemini conversations to Markdown or customizable image posters.",
+          "description": "Export Gemini conversations to Markdown or image.",
           "permissions": [
             "storage",
             "activeTab",
-            "scripting"
+            "scripting",
+            "clipboardWrite"
           ],
           "host_permissions": [
             "*://gemini.google.com/*"
@@ -249,7 +242,6 @@ alwaysApply: true
               "48": "assets/icon48.png",
               "128": "assets/icon128.png"
             }
-            // "default_popup": "popup/popup.html" // Uncomment if popup is implemented
           },
           "icons": {
             "16": "assets/icon16.png",
@@ -259,23 +251,18 @@ alwaysApply: true
           "content_scripts": [
             {
               "matches": ["*://gemini.google.com/*"],
-              "js": ["js/content.js"], // Adjusted path based on Vite output config
-              "css": ["assets/content.css"] // Example if content script has its own CSS bundle
+              "js": ["js/content.js"],
+              "css": ["assets/content.css"]
             }
           ],
           "web_accessible_resources": [
             {
               "resources": [
-                "assets/*",
-                "js/editor.js", // If editor is a separate bundle
-                "css/editor.css" // If editor has separate CSS
+                "assets/*"
               ],
               "matches": ["*://gemini.google.com/*"]
             }
           ]
-          // "background": {
-          //   "service_worker": "js/background.js" // Adjusted path
-          // }
         }
         ```
     *   验证: `manifest.json` 已创建并配置，`public/assets` 目录及占位图标已创建。
@@ -288,7 +275,7 @@ alwaysApply: true
     *   验证: 项目已成功初始化为 Git 仓库并完成首次提交。
 *   [x] **步骤 0.12: 添加 `package.json` scripts**
     *   任务:
-        *   [x] 编辑 `package.json`，添加 `dev` 和 `build` scripts。
+        *   [x] 编辑 `package.json`，添加 `dev`, `build`, `lint`, `preview` scripts。
     *   `scripts` 配置:
         ```json
         "scripts": {
@@ -311,28 +298,26 @@ alwaysApply: true
     *   验证: 在 `package.json` 中添加 `"dev": "vite build --watch"` 脚本 (或类似)，加载插件到浏览器后，在 Gemini 页面控制台能看到此消息，并且修改内容脚本后插件能自动重载。
 *   [x] **步骤 1.2: DOM 选择器研究与定义 (`src/content/selectors.ts`)**
     *   任务:
-        *   [x] 调研 Gemini 页面的 DOM 结构，确定如何准确选取每个回答的容器元素、"深度研究"报告的容器元素、以及已有的"复制"和/或"分享"按钮（或其父容器，以便注入我们的按钮）。
+        *   [x] 调研 Gemini 页面的 DOM 结构，确定如何准确选取每个回答的容器元素、以及注入导出按钮的位置。
         *   [x] 在 `src/content/selectors.ts` (新建) 中定义这些选择器常量。
-    *   验证: 通过浏览器开发者工具在多个不同的 Gemini 对话和报告页面上验证选择器的准确性和鲁棒性。
+    *   验证: 通过浏览器开发者工具在多个不同的 Gemini 对话页面上验证选择器的准确性和鲁棒性。
 *   [x] **步骤 1.3: 导出按钮/菜单的 UI 组件 (`src/content/components/ExportMenu.tsx`)**
     *   任务:
         *   [x] 使用 React 和 Tailwind CSS 创建一个名为 `ExportMenu.tsx` 的组件。
-        *   [x] 组件应包含一个触发按钮 (例如一个图标) 和一个点击后出现的下拉菜单，菜单项包括："复制为 MD"、"下载为 MD" (可选)、"导出为图片"。
-        *   [x] 确保样式使用 Tailwind CSS，并考虑如何避免与 Gemini 页面的样式冲突 (例如，给根元素一个独特 ID，并使用 Tailwind 的 `important` 选择器策略或前缀配置)。
-    *   验证: 组件可在测试页面 (`index.html` 或 Storybook/Ladle 如果引入) 中独立渲染和交互。
+        *   [x] 组件应包含一个触发按钮 (例如一个图标) 和一个点击后出现的下拉菜单，菜单项包括："复制为 MD"、"下载为 MD" (可选)、"复制为图片"、"下载为图片"。
+        *   [x] 确保样式使用 Tailwind CSS，并考虑如何避免与 Gemini 页面的样式冲突。
+    *   验证: 组件可在测试页面 (`index.html`) 中独立渲染和交互。
 *   [x] **步骤 1.4: 动态注入导出菜单到 Gemini 页面**
     *   任务:
-        *   [x] 在 `src/content/content.tsx` 中编写逻辑，使用 `MutationObserver` 监听 Gemini 页面的 DOM 变化，特别是回答元素 (`model-response`) 的出现。
-        *   [x] 对于每个检测到的目标元素，找到合适的注入点 (原始的分享导出按钮 `button[data-test-id="share-and-export-menu-button"]`)。
-        *   [x] (已修改逻辑) 给原始分享按钮添加点击事件，等待菜单面板 (`.mat-mdc-menu-panel`) 出现。
-        *   [x] (已修改逻辑) 在菜单面板中注入新的自定义菜单项按钮。
-        *   [x] 处理动态加载和移除的内容，确保监听器被正确添加和移除（通过 `__hasGeminiEnhancerListener` 标记和观察器 `disconnect`）。
-    *   验证: 插件加载后，点击每个 Gemini 回答的分享导出按钮，弹出的菜单中能看到新增的自定义菜单项，并且点击它们能在控制台打印日志。
+        *   [x] 在 `src/content/content.tsx` 中编写逻辑，使用 `MutationObserver` 监听 Gemini 页面的 DOM 变化。
+        *   [x] 对于每个检测到的目标元素 (`model-response`)，找到合适的注入点并渲染 `ExportMenu` 组件。
+        *   [x] 处理动态加载和移除的内容，确保监听器被正确添加和移除。
+    *   验证: 插件加载后，在每个 Gemini 回答附近能看到导出菜单图标，点击图标能展开包含正确选项的菜单。
 *   [x] **步骤 1.5: 内容块识别与数据传递准备**
     *   任务:
-        *   [x] 修改注入逻辑（或事件处理），使得点击自定义菜单项时，能够识别出是哪个回答块 (`model-response`) 触发的事件。
-        *   [x] 在事件处理函数中，能够访问到关联的 `model-response` 元素，并能从中提取内容区域的 HTML (`querySelector(GEMINI_SELECTORS.answerContent)`)。
-    *   验证: 点击菜单中的不同导出选项时，`content.tsx` 中的处理函数被调用，并且能正确识别关联的回答块并在控制台打印其内容 HTML。
+        *   [x] 修改注入逻辑（或事件处理），使得点击导出菜单项时，能够识别出是哪个回答块 (`model-response`) 触发的事件。
+        *   [x] 在事件处理函数中，能够访问到关联的 `model-response` 元素，并能从中提取内容区域的 DOM 元素 (`querySelector(GEMINI_SELECTORS.answerContent)`)。
+    *   验证: 点击菜单中的不同导出选项时，`content.tsx` 中的处理函数被调用，并且能正确识别关联的回答块元素。
 
 ---
 
@@ -342,101 +327,99 @@ alwaysApply: true
     *   任务:
         *   [x] 创建 `src/core/markdownConverter.ts`。
         *   [x] 实现一个函数，例如 `export function htmlToMarkdown(htmlString: string): string`，内部使用 `turndown` 库。
-        *   [x] 根据需要配置 `Turndown` 选项 (例如，GFM 风格，代码块的 `fence` 样式等)。
-    *   验证: 编写一些简单的单元测试，或者手动测试不同的 HTML 片段，验证转换结果是否符合预期。
+        *   [x] 根据需要配置 `Turndown` 选项。
+    *   验证: 单元测试或手动测试验证转换结果。
 *   [x] **步骤 2.2: "复制为 Markdown"功能实现**
     *   任务:
         *   [x] 在 `content.ts` 的 `onExportAction` 处理函数中，当 `actionType` 为 "copyMarkdown" 时：
             1.  [x] 获取关联内容块的 `innerHTML`。
             2.  [x] 调用 `htmlToMarkdown` 函数进行转换。
             3.  [x] 使用 `navigator.clipboard.writeText()` 将 Markdown 复制到剪贴板。
-            4.  [ ] (稍后阶段) 显示成功 Toast 通知。
-    *   验证: 在 Gemini 页面使用此功能，检查剪贴板内容是否为正确的 Markdown，格式是否基本保留。
+            4.  [ ] 显示成功 Toast 通知。
+    *   验证: 在 Gemini 页面使用此功能，检查剪贴板内容。
 *   [x] **步骤 2.3: (可选) "下载为 Markdown (.md)"功能实现**
     *   任务:
         *   [x] 在 `content.ts` 的 `onExportAction` 处理函数中，当 `actionType` 为 "downloadMarkdown" 时：
             1.  [x] 获取 HTML 并转换为 Markdown。
-            2.  [x] 创建一个 `Blob` 对象 (`new Blob([markdownString], { type: 'text/markdown' })`)。
-            3.  [x] 创建一个 `<a>` 元素，设置 `href` 为 `URL.createObjectURL(blob)`，设置 `download` 属性 (例如 `gemini_export.md`)。
-            4.  [x] 模拟点击 `<a>` 元素触发下载，之后 `URL.revokeObjectURL(href)`。
-            5.  [ ] (稍后阶段) 显示下载开始通知。
-    *   验证: 使用此功能，检查下载的 `.md` 文件内容和格式。
+            2.  [x] 创建 `Blob` 并生成下载链接触发下载。
+            3.  [ ] 显示下载开始通知。
+    *   验证: 使用此功能，检查下载的 `.md` 文件内容。
 
 ---
 
-**阶段 3: 核心功能 - 图片导出准备 (整合 markdown-to-image)**
+**阶段 3: 核心功能 - 图片导出**
 
-*   [ ] **步骤 3.1: 海报编辑器模态框组件 (`src/ui_components/Modal.tsx`)**
+*   [ ] **步骤 3.1: 核心图片生成模块 (`src/core/imageGenerator.ts`)**
     *   任务:
-        *   [ ] 创建一个通用的 `Modal.tsx` 组件 (位于 `src/ui_components/`)。
-        *   [ ] 使用 React 和 Tailwind CSS，实现一个可复用的模态框，特性包括：标题、内容区域、关闭按钮 (右上角)、可选的底部按钮区域。
-        *   [ ] 支持通过 props (例如 `isOpen`, `onClose`) 控制其显示/隐藏和关闭逻辑。
-    *   验证: 组件可在测试页面中独立渲染、打开和关闭。
-*   [ ] **步骤 3.2: 集成 markdown-to-image 样式与依赖**
+        *   [ ] 创建或完善 `src/core/imageGenerator.ts`。
+        *   [ ] 实现一个函数，例如 `export async function generateImageBlob(element: HTMLElement): Promise<Blob | null>`。
+        *   [ ] 内部使用 `html2canvas` 库将传入的 DOM 元素 `element` 渲染到 Canvas 上。
+        *   [ ] (重要) 在调用 `html2canvas` 前，可能需要对 `element` 或其克隆进行一些样式调整（如设置固定宽度、移除不必要的滚动条、确保背景色可见等）以获得更好的截图效果。
+        *   [ ] 将 Canvas 内容转换为 `Blob` 对象 (例如 `canvas.toBlob(resolve, 'image/png')`)。
+        *   [ ] 添加错误处理逻辑。
+    *   验证: 能够传入一个 DOM 元素，并成功生成对应的 PNG 图片 Blob 数据。
+
+*   [ ] **步骤 3.2: "复制为图片"功能实现**
     *   任务:
-        *   [ ] 确认已安装 `markdown-to-image` 依赖包及其所需要的周边库。
-        *   [ ] 在项目中引入 `markdown-to-image/dist/style.css` 样式文件以确保正确渲染。
-        *   [ ] 分析 `markdown-to-image` 包结构，了解其核心组件和 API (`Md2Poster`, `Md2PosterContent`, `Md2PosterHeader`, `Md2PosterFooter`)。
-        *   [ ] 创建配置文件 `markdownImageConfig.ts` 整合和定义组件、主题和尺寸选项。
-    *   验证: 可以成功从 `markdown-to-image` 导入所需组件并在简单测试组件中正确渲染。
-*   [ ] **步骤 3.3: 创建编辑器主应用及组件 (`src/editor/EditorApp.tsx`)**
+        *   [ ] 在 `content.ts` 的 `onExportAction` 处理函数中，当 `actionType` 为 "copyImage" 时：
+            1.  [ ] 获取关联内容块的 DOM 元素。
+            2.  [ ] 调用 `generateImageBlob` 函数获取图片 Blob。
+            3.  [ ] 如果成功获取 Blob，使用 `navigator.clipboard.write()` API 将图片写入剪贴板。
+                ```javascript
+                try {
+                  const blob = await generateImageBlob(element);
+                  if (blob) {
+                    await navigator.clipboard.write([
+                      new ClipboardItem({ 'image/png': blob })
+                    ]);
+                    // 显示成功 Toast
+                  } else {
+                    // 显示失败 Toast
+                  }
+                } catch (err) {
+                  console.error('Failed to copy image: ', err);
+                  // 显示失败 Toast
+                }
+                ```
+            4.  [ ] 确保 `manifest.json` 中已声明 `clipboardWrite` 权限。
+            5.  [ ] 显示操作结果 Toast 通知。
+    *   验证: 在 Gemini 页面使用此功能，能够将回答区域的截图复制到系统剪贴板，并可粘贴到其他应用中。
+
+*   [ ] **步骤 3.3: "下载为图片"功能实现**
     *   任务:
-        *   [ ] 创建主编辑器应用组件 `EditorApp.tsx`，实现基本布局，包含预览区域(右侧)和控制面板(左侧)。
-        *   [ ] 创建主题选择器组件 `ThemeSelector.tsx`，显示并提供9种预设主题切换功能。
-        *   [ ] 创建尺寸选择器组件 `SizeSelector.tsx`，提供海报比例选择功能。
-        *   [ ] 创建背景自定义组件 `BackgroundCustomizer.tsx`，支持背景颜色和图片设置。
-        *   [ ] 创建文本样式自定义组件 `TextStyleCustomizer.tsx`，支持颜色、字体、大小和对齐。
-        *   [ ] 创建页眉页脚自定义组件 `HeaderFooterCustomizer.tsx`，支持显示/隐藏和文本编辑。
-        *   [ ] 创建导出选项组件 `ExportOptions.tsx`，支持复制和下载图片功能。
-        *   [ ] 集成所有组件，并实现状态管理使选项变更即时影响预览区域。
-    *   验证: `EditorApp` 能够完整呈现，所有控制面板组件正常工作，并展示正确的预览效果。
-*   [ ] **步骤 3.4: 创建海报编辑器模态框组件 (`src/editor/PosterEditorModal.tsx`)**
-    *   任务:
-        *   [ ] 创建 `PosterEditorModal.tsx` 组件，整合 `Modal` 组件和 `EditorApp` 组件。
-        *   [ ] 实现接收 Markdown 内容并传递给 `EditorApp` 的功能。
-        *   [ ] 创建入口文件 `src/editor/index.ts` 导出所有必要组件。
-    *   验证: `PosterEditorModal` 组件可作为完整的海报编辑器使用，能接收 Markdown 内容并正确展示。
-*   [ ] **步骤 3.5: 内容脚本中触发并渲染编辑器模态框**
-    *   任务:
-        *   [ ] 在 `content.tsx` 中，当 `onExportAction` 的 `actionType` 为 "exportImage" 时：
-            1.  动态创建一个 `div` 作为 React 应用的根节点，并添加到 `document.body`。
-            2.  获取关联内容块的 HTML 并转换为 Markdown (`htmlToMarkdown` 函数)。
-            3.  使用 `ReactDOM.createRoot(mountPoint).render(<PosterEditorModal isOpen={true} onClose={handleCloseModal} markdownContent={markdownString} />);`。
-            4.  `handleCloseModal` 函数需要负责卸载 React 组件并移除挂载点 (`root.unmount(); mountPoint.remove();`)。
-    *   注意: 确保编辑器 UI 的 CSS 不受 Gemini 页面 CSS 影响，可使用 Shadow DOM 或样式隔离策略。
-    *   验证: 点击"导出为图片"选项后，包含 `EditorApp` 的模态框能正确显示并关闭。
+        *   [ ] 在 `content.ts` 的 `onExportAction` 处理函数中，当 `actionType` 为 "downloadImage" 时：
+            1.  [ ] 获取关联内容块的 DOM 元素。
+            2.  [ ] 调用 `generateImageBlob` 函数获取图片 Blob。
+            3.  [ ] 如果成功获取 Blob，创建一个 `<a>` 元素。
+            4.  [ ] 设置 `href` 为 `URL.createObjectURL(blob)`。
+            5.  [ ] 设置 `download` 属性 (例如 `gemini_export.png`)。
+            6.  [ ] 模拟点击 `<a>` 元素触发下载。
+            7.  [ ] 下载后使用 `URL.revokeObjectURL(href)` 释放资源。
+            8.  [ ] 显示下载开始或完成的 Toast 通知。
+    *   验证: 在 Gemini 页面使用此功能，能够成功下载包含回答区域截图的 PNG 文件。
 
 ---
 
 **阶段 4: 整合功能与性能优化**
 
-*   [ ] **步骤 4.1: 完成剩余UI组件与功能整合**
+*   [ ] **步骤 4.1: 实现 Toast 通知组件 (`src/ui_components/Toast.tsx`)**
     *   任务:
-        *   [ ] 实现 Toast 通知组件 (`src/ui_components/Toast.tsx`) 用于提供操作反馈。
-        *   [ ] 在关键操作（复制、下载完成等）后添加适当的成功提示。
-        *   [ ] 确保加载状态显示和错误处理在整个应用中一致。
-        *   [ ] 优化响应式布局，确保在各种屏幕尺寸下的良好体验。
-    *   验证: 应用提供清晰的用户反馈，各种尺寸的设备上显示正常。
+        *   [ ] 创建一个通用的 `Toast.tsx` 组件用于提供操作反馈 (成功、失败、信息)。
+        *   [ ] 在关键操作（复制、下载完成/失败等）后添加适当的提示。
+    *   验证: 操作后能看到清晰的用户反馈。
 *   [ ] **步骤 4.2: 性能优化与代码重构**
     *   任务:
-        *   [ ] 使用 React.memo, useCallback, useMemo 等优化组件渲染性能。
-        *   [ ] 检查并优化DOM操作，避免不必要的重渲染。
-        *   [ ] 优化大型图片处理，考虑使用 Web Workers 进行高耗时操作。
-        *   [ ] 重构代码以提高可维护性，添加必要的注释和文档。
-    *   验证: 应用响应迅速，图片生成和导出过程流畅无卡顿。
-*   [ ] **步骤 4.3: 数据持久化与设置存储**
+        *   [ ] 检查 `html2canvas` 的使用，确保只在需要时调用，避免不必要的性能开销。
+        *   [ ] 优化 DOM 操作和 `MutationObserver` 的效率。
+        *   [ ] 重构代码以提高可读性和可维护性。
+    *   验证: 插件响应迅速，图片生成和导出过程相对流畅。
+*   [ ] **步骤 4.3: 测试与调试**
     *   任务:
-        *   [ ] 实现用户配置持久化存储 (使用 `chrome.storage.sync` 或 localStorage)。
-        *   [ ] 保存用户最近使用的主题、尺寸、颜色等偏好设置。
-        *   [ ] 添加重置为默认值的功能。
-    *   验证: 用户设置在页面刷新或浏览器重启后仍能保持。
-*   [ ] **步骤 4.4: 测试与调试**
-    *   任务:
-        *   [ ] 对所有功能进行全面的手动测试，包括各种边界情况。
-        *   [ ] 在不同的Gemini页面和内容类型上测试。
-        *   [ ] 修复发现的Bug和UI问题。
-        *   [ ] 确保所有功能在Chrome和Edge浏览器上正常工作。
-    *   验证: 应用在各种情况下都能稳定工作，无明显bug。
+        *   [ ] 对所有功能进行全面的手动测试，包括 Markdown 和图片导出。
+        *   [ ] 在不同的 Gemini 页面和内容类型上测试（代码块、列表、图片等）。
+        *   [ ] 修复发现的 Bug 和 UI 问题。
+        *   [ ] 确保在 Chrome 和 Edge 浏览器上正常工作。
+    *   验证: 应用在各种情况下都能稳定工作，无明显 bug。
 
 ---
 
@@ -444,29 +427,21 @@ alwaysApply: true
 
 *   [ ] **步骤 5.1: 创建并配置最终插件图标**
     *   任务:
-        *   [ ] 设计并创建正式的插件图标 (16x16, 48x48, 128x128 像素的 PNG 图片)。
-        *   [ ] 将这些图标放入 `public/assets/` 目录，替换占位符图标，并确保 `manifest.json` 指向正确的文件名。
-    *   验证: 浏览器工具栏、扩展管理页面等位置显示美观、清晰的正式图标。
+        *   [ ] 设计并创建正式的插件图标 (16x16, 48x48, 128x128 PNG)。
+        *   [ ] 替换 `public/assets/` 中的占位符图标，并更新 `manifest.json`。
+    *   验证: 浏览器工具栏和扩展管理页面显示正式图标。
 *   [ ] **步骤 5.2: (可选) 实现插件 Popup 页面 (`src/popup/`)**
-    *   任务: 如果决定实现 Popup (用于设置、帮助信息等):
-        1.  [ ] 创建 `src/popup/popup.html`, `src/popup/main.tsx` (React 入口), 和 `src/popup/PopupApp.tsx` (Popup 的主 React 组件)。
-        2.  [ ] 在 `vite.config.ts` 的 `build.rollupOptions.input` 中为 `popup.html` 添加一个入口点 (Vite 通常会自动处理 HTML 文件作为入口)。
-        3.  [ ] 在 `manifest.json` 中配置 `action.default_popup` 指向 `popup/popup.html`。
-        4.  [ ] 实现 Popup 的 UI (例如，使用 Tailwind CSS) 和基本功能 (如显示插件版本、提供反馈链接等)。
-    *   验证: 点击浏览器工具栏上的插件图标能正确打开 Popup 页面，并显示预期内容。
-*   [ ] **步骤 5.3: 用户设置持久化 (`chrome.storage`)**
+    *   任务: 如果决定实现 Popup (用于帮助信息、反馈链接等，可能没有太多设置项了):
+        1.  [ ] 创建 Popup 相关文件 (`popup.html`, `main.tsx`, `PopupApp.tsx`)。
+        2.  [ ] 在 `vite.config.ts` 中添加入口点（如果需要 JS）。
+        3.  [ ] 在 `manifest.json` 中配置 `action.default_popup`。
+        4.  [ ] 实现 Popup 的 UI 和基本功能。
+    *   验证: 点击插件图标能打开 Popup 页面。
+*   [ ] **步骤 5.3: 错误处理与用户反馈完善**
     *   任务:
-        *   [ ] 确定需要持久化的用户设置 (例如，默认海报主题、上次使用的背景色、图片导出格式偏好等)。
-        *   [ ] 创建 `src/core/settingsManager.ts` (或类似模块)，封装 `chrome.storage.sync` (首选，可跨设备同步) 或 `chrome.storage.local` 的读写操作。
-        *   [ ] 在编辑器 `EditorApp` 和 (如果适用) Popup 中集成设置的读取和保存逻辑。
-    *   验证: 更改设置后，关闭并重新打开浏览器或编辑器，设置应能保持。
-*   [ ] **步骤 5.4: 错误处理与用户反馈完善**
-    *   任务:
-        *   [ ] 实现一个通用的 Toast 通知组件 (`src/ui_components/Toast.tsx`)，用于显示成功信息、警告或轻微错误。
-        *   [ ] 在所有关键操作（复制、下载、图片生成、设置保存等）后提供明确的用户反馈。
-        *   [ ] 对于可能发生的错误 (内容捕获失败、转换失败、权限问题等，参考 `interaction_logic.mdc` 第 6 节)，提供清晰、友好的错误提示和可能的解决方案。
-        *   [ ] 在耗时操作期间（如图片生成）显示加载指示器 (spinner)。
-    *   验证: 在各种正常和异常情况下，插件都能提供及时、清晰、友好的用户反馈。
+        *   [ ] 确保所有关键操作都有加载状态指示和明确的成功/失败反馈 (使用 Toast)。
+        *   [ ] 对于可能发生的错误 (内容捕获失败、`html2canvas` 失败、剪贴板写入失败等)，提供清晰、友好的错误提示。
+    *   验证: 在各种正常和异常情况下，插件都能提供及时、清晰的用户反馈。
 
 ---
 
@@ -474,50 +449,46 @@ alwaysApply: true
 
 *   [ ] **步骤 6.1: 全面功能测试**
     *   任务:
-        *   [ ] 参照需求文档和交互逻辑文档，对所有功能点进行系统性测试。
-        *   [ ] 在最新版本的 Google Chrome 和 Microsoft Edge 浏览器中进行测试。
+        *   [ ] 参照更新后的需求文档和交互逻辑文档，对所有功能点进行系统性测试 (Markdown 导出、图片复制、图片下载)。
+        *   [ ] 在最新版的 Google Chrome 和 Microsoft Edge 浏览器中进行测试。
     *   关注点: 功能的正确性、UI/UX 的流畅性、边界条件处理。
     *   验证: 所有核心功能按预期工作，无明显 bug。
 *   [ ] **步骤 6.2: 兼容性与鲁棒性测试**
     *   任务:
-        *   [ ] 测试编辑器在不同窗口大小下的响应式表现 (如果适用)。
-        *   [ ] 尝试在 Gemini 页面的多种不同布局、不同类型的回答（包括带代码块、列表、图片的回答）下测试内容识别和导出功能的鲁棒性。
+        *   [ ] 测试在 Gemini 页面的多种不同布局、不同类型的回答下，内容识别、Markdown 转换和图片生成功能的鲁棒性。
     *   验证: 插件在常见的使用场景和 Gemini 页面结构下都能稳定工作。
 *   [ ] **步骤 6.3: 性能评估与优化**
     *   任务:
-        *   [ ] 检查插件的性能，特别关注内容注入、编辑器打开速度、海报实时预览的流畅性以及图片生成时间。
-        *   [ ] 使用浏览器开发者工具 (Performance tab) 进行分析，找出潜在瓶颈。
-        *   [ ] 如有必要，进行优化 (例如，对 React 组件使用 `React.memo`, `useCallback`, `useMemo`; 优化 DOM 操作; 考虑代码分割等)。
+        *   [ ] 检查插件的性能，特别关注内容注入、图片生成时间和对页面性能的影响。
+        *   [ ] 使用浏览器开发者工具进行分析，找出潜在瓶颈。
+        *   [ ] 如有必要，进行优化。
     *   验证: 插件运行流畅，不引起浏览器卡顿或明显延迟。
 *   [ ] **步骤 6.4: 准备生产构建**
     *   任务:
         *   [ ] 确保 `package.json` 中的 `build` 脚本 (`vite build`) 正确配置。
         *   [ ] 运行 `pnpm build`。
-        *   [ ] 检查 `dist/` 目录生成的产物是否符合预期 (JS, CSS, assets, manifest.json)。
-        *   [ ] 确保没有包含 sourcemaps (除非商店允许或用于私下分发调试版)。Vite 默认在生产构建中不包含。
-    *   验证: `dist/` 目录内容完整且优化，文件大小合理。
+        *   [ ] 检查 `dist/` 目录生成的产物。
+        *   [ ] 确保没有包含 sourcemaps。
+    *   验证: `dist/` 目录内容完整且优化。
 *   [ ] **步骤 6.5: 打包为 `.zip` 文件供上传**
     *   任务:
-        *   [ ] 将 `dist/` 目录的所有内容打包成一个 `.zip` 文件 (例如 `gemini-export-enhancer-v0.1.0.zip`)。
-        *   [ ] 确保 `.zip` 文件的根目录就是 `manifest.json` 及其引用的文件和目录的结构。
-    *   验证: `.zip` 文件结构符合 Chrome Web Store 和 Edge Add-ons 商店的上传要求。
+        *   [ ] 将 `dist/` 目录的所有内容打包成一个 `.zip` 文件。
+        *   [ ] 确保 `.zip` 文件结构符合商店要求。
+    *   验证: `.zip` 文件结构正确。
 *   [ ] **步骤 6.6: 编写商店列表信息和宣传材料**
     *   任务:
-        *   [ ] 准备插件在应用商店中展示的名称、详细描述、功能亮点、使用说明。
-        *   [ ] 创建高质量的截图 (展示插件功能和海报效果) 和一个简短的宣传视频 (可选)。
-        *   [ ] 准备隐私政策说明 (如果收集任何数据，即使是 `chrome.storage.sync` 也应说明)。
-    *   验证: 所有商店列表所需的材料齐全、专业且能吸引用户。
+        *   [ ] 准备插件在应用商店中展示的名称、描述、功能亮点 (强调 Markdown 和直接图片导出)。
+        *   [ ] 创建高质量的截图 (展示插件功能和直接导出的图片效果)。
+        *   [ ] 准备隐私政策说明。
+    *   验证: 所有商店列表所需的材料齐全。
 
 ---
 
 **后续维护与迭代**
 
 *   [ ] **任务: 监控用户反馈**
-    *   途径: 应用商店评论、GitHub Issues (如果开源)。
 *   [ ] **任务: 应对 Gemini 页面更新**
-    *   策略: 定期检查插件在最新 Gemini 版本上的兼容性，及时更新 DOM 选择器和注入逻辑。
-*   [ ] **任务: 功能迭代**
-    *   规划: 根据用户需求和项目目标，逐步实现需求文档中"未来可能的扩展"部分的功能。
+*   [ ] **任务: 功能迭代** (根据需求文档的"未来可能的扩展"部分，如 PDF 导出、图片编辑器等)。
 
 ---
 
