@@ -199,7 +199,7 @@ const deepResearchObserver = new MutationObserver((mutationsList) => {
       mutation.addedNodes.forEach(node => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           const element = node as HTMLElement;
-          if (element.matches(GEMINI_SELECTORS.deepDiveReport.deepResearchPanel) || element.querySelector(GEMINI_SELECTORS.deepDiveReport.deepResearchPanel)) {
+          if (element.matches(GEMINI_SELECTORS.deepDiveReport.panelContainer) || element.querySelector(GEMINI_SELECTORS.deepDiveReport.panelContainer)) {
             panelFound = true;
           }
         }
@@ -209,16 +209,16 @@ const deepResearchObserver = new MutationObserver((mutationsList) => {
         document.body.setAttribute('data-gemini-enhancer-deep-research-active', 'true');
         console.log("Gemini Export Enhancer: Deep Research Panel DETECTED & marked active.");
         setTimeout(() => { // Delay to ensure toolbar elements are ready
-          const toolbar = document.querySelector(GEMINI_SELECTORS.deepDiveReport.toolbar.container);
+          const toolbar = document.querySelector(GEMINI_SELECTORS.deepDiveReport.container);
           if (toolbar) {
             const actionButtons = toolbar.querySelector<HTMLElement>(GEMINI_SELECTORS.deepDiveReport.toolbar.actionButtons);
             if (actionButtons) {
               injectDeepResearchMenu(actionButtons);
             } else {
-              console.warn("Gemini Export Enhancer: Deep Research .action-buttons not found.");
+              console.warn("Gemini Export Enhancer: Deep Research .action-buttons not found within toolbar:", toolbar);
             }
           } else {
-            console.warn("Gemini Export Enhancer: Deep Research toolbar container not found.");
+            console.warn("Gemini Export Enhancer: Deep Research toolbar container (", GEMINI_SELECTORS.deepDiveReport.container, ") not found.");
           }
         }, 500);
       }
@@ -227,13 +227,13 @@ const deepResearchObserver = new MutationObserver((mutationsList) => {
       mutation.removedNodes.forEach(node => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           const element = node as HTMLElement;
-          if (element.matches(GEMINI_SELECTORS.deepDiveReport.deepResearchPanel)) {
+          if (element.matches(GEMINI_SELECTORS.deepDiveReport.panelContainer)) {
             panelRemoved = true;
           }
         }
       });
       // Check if the panel is truly gone from the document as a whole
-      if (!document.querySelector(GEMINI_SELECTORS.deepDiveReport.deepResearchPanel) && document.body.getAttribute('data-gemini-enhancer-deep-research-active')) {
+      if (!document.querySelector(GEMINI_SELECTORS.deepDiveReport.panelContainer) && document.body.getAttribute('data-gemini-enhancer-deep-research-active')) {
          panelRemoved = true; // Confirm removal
       }
 

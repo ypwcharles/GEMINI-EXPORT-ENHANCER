@@ -90,28 +90,29 @@ export const GEMINI_SELECTORS = {
    */
   deepDiveReport: {
     /**
-     * 深度研究面板的顶层标识元素
+     * 深度研究/沉浸式面板的顶层标识元素
+     * 从 'deep-research-immersive-panel' 改为 'immersive-panel'
      */
-    deepResearchPanel: 'deep-research-immersive-panel',
+    panelContainer: 'immersive-panel', // 替换了 deepResearchPanel
 
     /**
-     * 深度研究报告的容器元素
+     * 深度研究报告的工具栏容器，之前叫做 container，现在确保其值为 'toolbar.extended-response-toolbar'
      */
-    container: '.toolbar.has-title',
+    container: 'toolbar.extended-response-toolbar',
 
     /**
-     * 用于定位"深度研究"报告中我们想要注入自定义按钮的区域
-     * 将会注入到 .action-buttons 中，此选择器指向作为参照的 "Export to Docs" 按钮
+     * 用于定位注入自定义按钮的容器区域 (.action-buttons)
+     * 之前叫做 injectionPoint，现在明确为 injectionPointContainer
      */
-    injectionPoint: 'export-to-docs-button[data-test-id="export-to-docs-button"]',
+    injectionPointContainer: 'toolbar.extended-response-toolbar .action-buttons',
 
     /**
-     * 用于定位深度研究报告内容本身，以便提取HTML
+     * 用于定位深度研究/沉浸式报告内容本身，以便提取HTML
      */
-    content: 'message-content[data-test-id="message-content"]',
+    content: 'immersive-editor[data-test-id="immersive-editor"] .ProseMirror',
 
     /**
-     * 滚动容器元素
+     * 滚动容器元素 (如果需要)
      */
     scrollContainer: 'div[data-test-id="scroll-container"]',
 
@@ -157,7 +158,7 @@ export const GEMINI_SELECTORS = {
       /**
        * 工具栏容器
        */
-      container: '.toolbar.has-title',
+      container: 'toolbar.extended-response-toolbar', // 与外部的 deepDiveReport.container 一致
 
       /**
        * 左侧面板（包含标题和图标）
@@ -172,22 +173,22 @@ export const GEMINI_SELECTORS = {
       /**
        * 操作按钮区域
        */
-      actionButtons: '.action-buttons',
+      actionButtons: '.action-buttons', // 注入点容器的直接子选择器
 
       /**
        * 导出到Google文档按钮
        */
-      exportToDocsButton: 'button[data-test-id="export-to-docs-button"]',
-
-      /**
-       * 音频概览按钮
-       */
-      audioOverviewButton: 'button[data-test-id="top-level-audio-overview-button"]',
+      exportToDocsButton: 'export-to-docs-button[data-test-id="export-to-docs-button"]',
 
       /**
        * 复制按钮
        */
-      copyButton: 'button[data-test-id="copy-button"]',
+      copyButton: 'copy-button[data-test-id="copy-button"]',
+
+      /**
+       * 分享按钮
+       */
+      shareButton: 'share-button[data-test-id="share-button"]',
 
       /**
        * 关闭按钮
