@@ -3,6 +3,11 @@ import ReactDOM from 'react-dom/client'; // Import ReactDOM
 // import Toast from '../ui_components/Toast'; // No longer needed
 import { Toaster } from '@/components/ui/sonner'; // Import shadcn/ui Toaster (Sonner wrapper)
 import { toast } from 'sonner'; // Import toast function from Sonner
+import {
+  ClipboardDocumentIcon,
+  ArrowDownTrayIcon,
+  PhotoIcon,
+} from '@heroicons/react/24/outline'; // Import necessary icons
 import { GEMINI_SELECTORS } from './selectors';
 import { htmlToMarkdown } from '../core/markdownConverter';
 import { generateImageBlob } from '../core/imageGenerator';
@@ -58,14 +63,118 @@ function triggerDownload(blob: Blob, filename: string) {
 
 function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLElement) {
   if (shareMenuPanel.querySelector('.gemini-enhancer-custom-item')) {
-    // console.log("Gemini Export Enhancer: Custom menu items already exist. Skipping injection.");
     return;
   }
   console.log("Gemini Export Enhancer: Share menu panel found, associating with answer block:", answerBlockRoot);
 
+  // Define menu items with updated labels and icons
   const itemsToInject = [
-    { 
-      label: '复制为 MD (自定义)', 
+    {
+      label: '复制为图片',
+      icon: PhotoIcon,
+      action: async (blockRoot: HTMLElement) => {
+        console.log('Action started: Copy Image for block:', blockRoot);
+        
+        // Find content element using selectors
+        let contentElement = blockRoot.querySelector(GEMINI_SELECTORS.answerContent);
+        if (!contentElement) {
+          console.log('DEBUG: Copy Image - Main selector failed, trying fallbacks...');
+          for (const fallbackSelector of GEMINI_SELECTORS.answerContentFallbacks) {
+            contentElement = blockRoot.querySelector(fallbackSelector);
+            if (contentElement) {
+              console.log('DEBUG: Copy Image - Fallback selector success:', fallbackSelector);
+              break;
+            }
+          }
+        }
+        
+        console.log('DEBUG: Copy Image - Final content element:', contentElement);
+
+        if (contentElement) {
+          console.log('  Content element found for Copy Image.');
+          try {
+            // Generate image blob
+            const blob = await generateImageBlob(contentElement as HTMLElement);
+            
+            if (blob) {
+              console.log('  Image blob generated successfully. Size:', blob.size);
+              // Copy blob to clipboard
+              await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+              ]);
+              console.log('Success: Image copied to clipboard!');
+              toast.success('图片已复制到剪贴板');
+            } else {
+              console.error('  Image blob generation failed (returned null).');
+              toast.error('图片生成失败', { description: '无法复制图片，请检查控制台。' });
+            }
+          } catch (error: any) {
+            console.error('Error during Image copy:', error);
+            toast.error('复制图片时出错', { description: error?.message });
+          }
+        } else {
+          console.error('  Could not find content element for Copy Image using any selector');
+          console.log('  Inspect blockRoot HTML:', blockRoot.innerHTML.substring(0, 300), '...');
+          toast.error('无法找到内容元素', { description: '无法复制图片，请检查控制台。' });
+        }
+      }
+    },
+    {
+      label: '下载为图片',
+      icon: ArrowDownTrayIcon,
+      action: async (blockRoot: HTMLElement) => {
+        console.log('Action started: Download Image for block:', blockRoot);
+        
+        // Find content element using selectors
+        let contentElement = blockRoot.querySelector(GEMINI_SELECTORS.answerContent);
+        if (!contentElement) {
+          console.log('DEBUG: Download Image - Main selector failed, trying fallbacks...');
+          for (const fallbackSelector of GEMINI_SELECTORS.answerContentFallbacks) {
+            contentElement = blockRoot.querySelector(fallbackSelector);
+            if (contentElement) {
+              console.log('DEBUG: Download Image - Fallback selector success:', fallbackSelector);
+              break;
+            }
+          }
+        }
+        
+        console.log('DEBUG: Download Image - Final content element:', contentElement);
+
+        if (contentElement) {
+          console.log('  Content element found for Download Image.');
+          try {
+            // Generate image blob
+            const blob = await generateImageBlob(contentElement as HTMLElement);
+            
+            if (blob) {
+              console.log('  Image blob generated successfully. Size:', blob.size);
+              // Trigger download
+              const date = new Date();
+              const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+              const formattedTime = `${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}`;
+              const filename = `Gemini-Export-${formattedDate}_${formattedTime}.png`;
+              
+              triggerDownload(blob, filename);
+              console.log('Success: Image download initiated!');
+              toast.info('图片文件下载已开始');
+            } else {
+              console.error('  Image blob generation failed (returned null).');
+              toast.error('图片生成失败', { description: '无法下载图片，请检查控制台。' });
+            }
+          } catch (error: any) {
+            console.error('Error during Image download:', error);
+            toast.error('下载图片时出错', { description: error?.message });
+          }
+        } else {
+          console.error('  Could not find content element for Download Image using any selector');
+          console.log('  Inspect blockRoot HTML:', blockRoot.innerHTML.substring(0, 300), '...');
+          toast.error('无法找到内容元素', { description: '无法下载图片，请检查控制台。' });
+        }
+      }
+    },
+    {
+      label: '复制为 Markdown',
+      icon: ClipboardDocumentIcon,
       action: async (blockRoot: HTMLElement) => {
         console.log('Action started: Copy MD for block:', blockRoot);
         console.log('DEBUG: 使用主选择器:', GEMINI_SELECTORS.answerContent);
@@ -138,8 +247,9 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
         }
       }
     },
-    { 
-      label: '下载为 MD (自定义)', 
+    {
+      label: '下载为 Markdown',
+      icon: ArrowDownTrayIcon,
       action: async (blockRoot: HTMLElement) => {
         console.log('Action started: Download MD for block:', blockRoot);
         
@@ -247,171 +357,143 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
         }
       }
     },
-    { 
-      label: '复制为图片 (自定义)',
-      action: async (blockRoot: HTMLElement) => {
-        console.log('Action started: Copy Image for block:', blockRoot);
-        
-        // Find content element using selectors
-        let contentElement = blockRoot.querySelector(GEMINI_SELECTORS.answerContent);
-        if (!contentElement) {
-          console.log('DEBUG: Copy Image - Main selector failed, trying fallbacks...');
-          for (const fallbackSelector of GEMINI_SELECTORS.answerContentFallbacks) {
-            contentElement = blockRoot.querySelector(fallbackSelector);
-            if (contentElement) {
-              console.log('DEBUG: Copy Image - Fallback selector success:', fallbackSelector);
-              break;
-            }
-          }
-        }
-        
-        console.log('DEBUG: Copy Image - Final content element:', contentElement);
-
-        if (contentElement) {
-          console.log('  Content element found for Copy Image.');
-          try {
-            // Generate image blob
-            const blob = await generateImageBlob(contentElement as HTMLElement);
-            
-            if (blob) {
-              console.log('  Image blob generated successfully. Size:', blob.size);
-              // Copy blob to clipboard
-              await navigator.clipboard.write([
-                new ClipboardItem({ 'image/png': blob })
-              ]);
-              console.log('Success: Image copied to clipboard!');
-              toast.success('图片已复制到剪贴板');
-            } else {
-              console.error('  Image blob generation failed (returned null).');
-              toast.error('图片生成失败', { description: '无法复制图片，请检查控制台。' });
-            }
-          } catch (error: any) {
-            console.error('Error during Image copy:', error);
-            toast.error('复制图片时出错', { description: error?.message });
-          }
-        } else {
-          console.error('  Could not find content element for Copy Image using any selector');
-          console.log('  Inspect blockRoot HTML:', blockRoot.innerHTML.substring(0, 300), '...');
-          toast.error('无法找到内容元素', { description: '无法复制图片，请检查控制台。' });
-        }
-      }
-    },
-    { 
-      label: '下载为图片 (自定义)',
-      action: async (blockRoot: HTMLElement) => {
-        console.log('Action started: Download Image for block:', blockRoot);
-        
-        // Find content element using selectors
-        let contentElement = blockRoot.querySelector(GEMINI_SELECTORS.answerContent);
-        if (!contentElement) {
-          console.log('DEBUG: Download Image - Main selector failed, trying fallbacks...');
-          for (const fallbackSelector of GEMINI_SELECTORS.answerContentFallbacks) {
-            contentElement = blockRoot.querySelector(fallbackSelector);
-            if (contentElement) {
-              console.log('DEBUG: Download Image - Fallback selector success:', fallbackSelector);
-              break;
-            }
-          }
-        }
-        
-        console.log('DEBUG: Download Image - Final content element:', contentElement);
-
-        if (contentElement) {
-          console.log('  Content element found for Download Image.');
-          try {
-            // Generate image blob
-            const blob = await generateImageBlob(contentElement as HTMLElement);
-            
-            if (blob) {
-              console.log('  Image blob generated successfully. Size:', blob.size);
-              // Trigger download
-              const date = new Date();
-              const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-              const formattedTime = `${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}`;
-              const filename = `Gemini-Export-${formattedDate}_${formattedTime}.png`;
-              
-              triggerDownload(blob, filename);
-              console.log('Success: Image download initiated!');
-              toast.info('图片文件下载已开始');
-            } else {
-              console.error('  Image blob generation failed (returned null).');
-              toast.error('图片生成失败', { description: '无法下载图片，请检查控制台。' });
-            }
-          } catch (error: any) {
-            console.error('Error during Image download:', error);
-            toast.error('下载图片时出错', { description: error?.message });
-          }
-        } else {
-          console.error('  Could not find content element for Download Image using any selector');
-          console.log('  Inspect blockRoot HTML:', blockRoot.innerHTML.substring(0, 300), '...');
-          toast.error('无法找到内容元素', { description: '无法下载图片，请检查控制台。' });
-        }
-      }
-    },
   ];
 
-  const divider = shareMenuPanel.querySelector('mat-divider');
+  // Store the original first child (could be a native item or something else)
+  const originalFirstChild = shareMenuPanel.firstChild;
 
-  itemsToInject.forEach(item => {
+  // Reverse the order so they appear correctly when prepended
+  const reversedItems = [...itemsToInject]; // No need to reverse if prepending in order
+
+  reversedItems.forEach(item => {
     const button = document.createElement('button');
-    button.textContent = item.label;
+    button.setAttribute('role', 'menuitem');
     button.classList.add('gemini-enhancer-custom-item');
-    button.style.display = 'block';
+
+    // --- Apply Styling for the main button (layout, color, fontFamily) ---
+    button.style.display = 'flex';
+    button.style.alignItems = 'center';
     button.style.width = '100%';
-    button.style.padding = '8px 16px';
+    button.style.padding = '0px 16px';
+    button.style.height = '48px';
     button.style.textAlign = 'left';
     button.style.border = 'none';
     button.style.background = 'none';
     button.style.cursor = 'pointer';
-    button.onmouseenter = () => button.style.backgroundColor = '#f0f0f0'; // Basic hover
-    button.onmouseleave = () => button.style.backgroundColor = 'transparent';
+    button.style.fontSize = '14px'; // Keep consistent font size for the button context
+    button.style.fontFamily = 'inherit'; // Button inherits font family
 
+    const nativeMenuButton = shareMenuPanel.querySelector('button[mat-menu-item]');
+    button.style.color = nativeMenuButton ? getComputedStyle(nativeMenuButton).color : 'rgb(32, 33, 36)';
+    // fontWeight will be set on the textSpan directly, not the button.
+
+    // --- Hover effect (remains the same) ---
+    const isDarkMode = document.documentElement.getAttribute('dark') === 'true' ||
+                       document.documentElement.classList.contains('dark') ||
+                       (window.getComputedStyle(document.body).backgroundColor &&
+                        parseInt(window.getComputedStyle(document.body).backgroundColor.split('(')[1]) < 128);
+    const lightModeHoverBg = 'rgba(0, 0, 0, 0.04)';
+    const darkModeHoverBg = 'rgba(255, 255, 255, 0.1)';
+    button.onmouseenter = () => {
+        button.style.backgroundColor = isDarkMode ? darkModeHoverBg : lightModeHoverBg;
+    };
+    button.onmouseleave = () => {
+        button.style.backgroundColor = 'transparent';
+    };
+
+    // --- Create and append Icon (remains the same) ---
+    const iconContainer = document.createElement('span');
+    iconContainer.style.marginRight = '16px';
+    iconContainer.style.display = 'flex';
+    iconContainer.style.alignItems = 'center';
+    const iconRoot = ReactDOM.createRoot(iconContainer);
+    iconRoot.render(React.createElement(item.icon, { style: { width: '20px', height: '20px' } }));
+    button.appendChild(iconContainer);
+
+    // --- Create and append Text (with specific fontWeight) ---
+    const textSpan = document.createElement('span');
+    textSpan.textContent = item.label;
+
+    const nativeMenuItemText = shareMenuPanel.querySelector('button[mat-menu-item] span.mat-mdc-menu-item-text');
+    if (nativeMenuItemText) {
+      const computedWeight = getComputedStyle(nativeMenuItemText as HTMLElement).fontWeight;
+      textSpan.style.fontWeight = computedWeight;
+      // console.log("Applied fontWeight from native span.mat-mdc-menu-item-text:", computedWeight);
+    } else {
+      // Fallback if native text span is not found for style query.
+      // '500' is a common "medium" weight, often used in Material Design menus.
+      textSpan.style.fontWeight = '500';
+      // console.log("Applied fallback fontWeight: 500 to textSpan");
+    }
+    button.appendChild(textSpan);
+
+    // --- Onclick Handler (remains the same) ---
     button.onclick = async (e) => {
       console.log(`Gemini Export Enhancer: Custom button '${item.label}' CLICKED.`);
-      e.stopPropagation(); 
+      e.stopPropagation();
       e.preventDefault();
-      
       try {
         console.log("Gemini Export Enhancer: Attempting to call action function...");
         await item.action(answerBlockRoot);
         console.log("Gemini Export Enhancer: Action function called successfully.");
       } catch (error) {
         console.error("Gemini Export Enhancer: Error executing action function:", error);
-        // Error toast is likely handled within item.action, but consider a generic one if not.
       }
-      
-      // Attempt to close the menu AFTER the action has completed
-      // Use a small delay to ensure other UI updates (like toast) can render before menu vanishes
+      // Attempt to close menu (remains the same)
       setTimeout(() => {
         const menuPanel = document.querySelector(GEMINI_SELECTORS.shareMenu.menuPanel) as HTMLElement;
         if (menuPanel && menuPanel.offsetParent !== null) { // Check if menu is still visible/in DOM
-          try {
-            // Attempt 1: Click the CDK overlay backdrop (common for Angular Material menus)
-            const cdkBackdrop = document.querySelector('.cdk-overlay-backdrop');
-            if (cdkBackdrop && cdkBackdrop instanceof HTMLElement) {
-              cdkBackdrop.click();
-              console.log("Gemini Export Enhancer: Attempted to close menu by clicking .cdk-overlay-backdrop");
-              return; // Assume this worked
+            try {
+                // Attempt 1: Click the CDK overlay backdrop (common for Angular Material menus)
+                const cdkBackdrop = document.querySelector('.cdk-overlay-backdrop');
+                if (cdkBackdrop && cdkBackdrop instanceof HTMLElement) {
+                    cdkBackdrop.click();
+                    console.log("Gemini Export Enhancer: Attempted to close menu by clicking .cdk-overlay-backdrop");
+                    return; // Assume this worked
+                }
+                // Attempt 2: Fallback to clicking document.body (less reliable but worth a try)
+                document.body.click();
+                console.log("Gemini Export Enhancer: Attempted to close menu by clicking document.body (fallback)");
+            } catch (error) {
+                console.error("Gemini Export Enhancer: Error attempting to close menu panel:", error);
             }
-
-            // Attempt 2: Fallback to clicking document.body (less reliable but worth a try)
-            document.body.click();
-            console.log("Gemini Export Enhancer: Attempted to close menu by clicking document.body (fallback)");
-
-          } catch (error) {
-            console.error("Gemini Export Enhancer: Error attempting to close menu panel:", error);
-          }
         }
-      }, 100); // 100ms delay, can be adjusted
+      }, 100);
     };
 
-    if (divider && divider.parentNode) {
-      divider.parentNode.insertBefore(button, divider.nextSibling);
-    } else {
-      shareMenuPanel.appendChild(button);
-    }
-    console.log(`Gemini Export Enhancer: Injected '${item.label}'`);
+    // --- Use prepend for simpler insertion ---
+    shareMenuPanel.prepend(button);
+
+    console.log(`Gemini Export Enhancer: Prepended '${item.label}'`);
   });
+
+  // --- Add Divider after all custom items ---
+  // Check if a divider already exists right after our last prepended item (which is now the first child)
+  const firstPrependedItem = shareMenuPanel.firstChild;
+  // Find the last prepended custom item
+  const customItems = shareMenuPanel.querySelectorAll('.gemini-enhancer-custom-item');
+  const lastPrependedItem = customItems[customItems.length - 1]; // Last custom item added
+
+  if (lastPrependedItem && lastPrependedItem.nextSibling) {
+      // Check if the node immediately after our last item is NOT already a divider
+      if (!(lastPrependedItem.nextSibling instanceof HTMLElement && lastPrependedItem.nextSibling.tagName.toLowerCase() === 'mat-divider')) {
+            const newDivider = document.createElement('mat-divider');
+            newDivider.setAttribute('role', 'separator');
+            newDivider.style.borderTop = '1px solid rgba(0,0,0,0.12)'; // Basic styling
+            newDivider.style.margin = '8px 0';
+            // Insert the divider AFTER the last custom item
+            shareMenuPanel.insertBefore(newDivider, lastPrependedItem.nextSibling);
+            console.log("Gemini Export Enhancer: Added divider after custom items.");
+      }
+  } else if (lastPrependedItem && !lastPrependedItem.nextSibling && originalFirstChild) {
+      // If our items are the only ones AND there were original items, add divider at the end
+       const newDivider = document.createElement('mat-divider');
+        newDivider.setAttribute('role', 'separator');
+        newDivider.style.borderTop = '1px solid rgba(0,0,0,0.12)';
+        newDivider.style.margin = '8px 0';
+        shareMenuPanel.appendChild(newDivider); // Append divider
+        console.log("Gemini Export Enhancer: Added divider at the end (custom items were last).");
+  }
 }
 
 function handleShareButtonClick(this: HTMLButtonElement, event: MouseEvent, answerBlockRoot: HTMLElement) {

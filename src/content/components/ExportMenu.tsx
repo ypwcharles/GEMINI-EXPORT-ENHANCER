@@ -49,16 +49,20 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
 
   const handleActionClick = async (actionType: string) => {
     console.log('Action clicked:', actionType, 'Target:', targetElement);
-    setCopyStatus('idle'); // Reset status before action
+    // No longer setting copyStatus to idle here, managed within try/catch/finally
+    // setCopyStatus('idle'); // Reset status before action - REMOVED
 
     try {
+      // Determine if it's a copy action BEFORE performing it
+      const isCopyAction = actionType.startsWith('copy');
+
       await onExportAction(actionType, targetElement); // Assume onExportAction might be async now
 
-      if (actionType.startsWith('copy')) {
+      if (isCopyAction) {
         setCopyStatus('success');
         // Keep menu open briefly to show success, then close
         setTimeout(() => {
-          closeMenu();
+          closeMenu(); // Close menu after success timeout
         }, 1500); // Close after 1.5 seconds
       } else {
         // For downloads, close immediately as browser handles feedback
@@ -70,35 +74,39 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
       setCopyStatus('error');
       // Keep menu open briefly to show error, then close
       setTimeout(() => {
-        closeMenu();
+        closeMenu(); // Close menu after error timeout
       }, 2000); // Close after 2 seconds
+    } finally {
+       // Reset status slightly later for copy actions to allow checkmark display
+       if (!actionType.startsWith('copy')) {
+         setCopyStatus('idle');
+       } else {
+         // For copy actions, reset only after the timeout completes or if closed manually
+         // The closeMenu function already resets the status.
+       }
     }
   };
 
   const menuItems = [
     {
-      label: '复制为 Markdown',
-      icon: copyStatus === 'success' && isOpen ? CheckIcon : ClipboardIcon,
-      action: 'copyMarkdown',
-      disabled: copyStatus === 'success' || copyStatus === 'error',
-    },
-    {
-      label: '下载为 Markdown',
-      icon: ArrowDownTrayIcon,
-      action: 'downloadMarkdown',
-      disabled: copyStatus !== 'idle',
-    },
-    {
       label: '复制为图片',
-      icon: copyStatus === 'success' && isOpen ? CheckIcon : PhotoIcon,
+      icon: PhotoIcon,
       action: 'copyImage',
-      disabled: copyStatus === 'success' || copyStatus === 'error',
     },
     {
       label: '下载为图片',
       icon: ArrowDownTrayIcon,
       action: 'downloadImage',
-      disabled: copyStatus !== 'idle',
+    },
+    {
+      label: '复制为 Markdown',
+      icon: ClipboardDocumentIcon,
+      action: 'copyMarkdown',
+    },
+    {
+      label: '下载为 Markdown',
+      icon: ArrowDownTrayIcon,
+      action: 'downloadMarkdown',
     },
   ];
 
@@ -128,25 +136,40 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
           aria-labelledby="menu-button"
         >
           <div className="py-1" role="none">
-            {menuItems.map((item) => (
-              <button
-                key={item.action}
-                onClick={() => handleActionClick(item.action)}
-                disabled={item.disabled}
-                className={`text-gray-700 dark:text-gray-200 block w-full text-left px-4 py-2 text-sm ${
-                  item.disabled
-                    ? 'opacity-50 cursor-not-allowed'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
-                } flex items-center transition-colors duration-150`}
-                role="menuitem"
-              >
-                <item.icon className="mr-3 h-5 w-5" aria-hidden="true" />
-                <span>{item.label}</span>
-                {copyStatus === 'error' && item.action.startsWith('copy') && (
-                  <XMarkIcon className="ml-auto h-5 w-5 text-red-500" />
-                )}
-              </button>
-            ))}
+            {menuItems.map((item) => {
+              // Determine the icon to display based on the state
+              const isCopy = item.action.startsWith('copy');
+              const isDisabled = (isCopy && (copyStatus === 'success' || copyStatus === 'error')); // Disable copy items during feedback
+              let CurrentIcon = item.icon;
+              if (isCopy && copyStatus === 'success' && isOpen) {
+                CurrentIcon = CheckIcon;
+              }
+
+              return (
+                <button
+                  key={item.action}
+                  onClick={() => handleActionClick(item.action)}
+                  disabled={isDisabled}
+                  // Apply Gemini-like styles, maintaining existing Tailwind approach
+                  // Ensure consistent padding and font size. Adjust if needed after visual inspection.
+                  className={`text-gray-700 dark:text-gray-200 block w-full text-left px-4 py-2 text-sm ${
+                    isDisabled
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+                  } flex items-center transition-colors duration-150`} // Keep existing classes for now
+                  role="menuitem"
+                >
+                  {/* Render the dynamically determined icon */}
+                  <CurrentIcon className="mr-3 h-5 w-5 flex-shrink-0" aria-hidden="true" />
+                  {/* Updated label is used here */}
+                  <span>{item.label}</span>
+                  {/* Show error icon only for the specific copy action that failed */}
+                   {isCopy && copyStatus === 'error' && isOpen && ( // Check isOpen to hide when closing
+                    <XMarkIcon className="ml-auto h-5 w-5 text-red-500" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
