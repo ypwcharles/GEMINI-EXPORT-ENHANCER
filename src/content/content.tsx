@@ -246,19 +246,32 @@ document.addEventListener('click', (event) => {
 
   // Check if the clicked element *is* or *is inside* the original share button
   const shareButton = target.closest<HTMLButtonElement>(GEMINI_SELECTORS.injectionPointInAnswer);
+  
+  // First, clean up any lingering flags from other buttons
+  document.querySelectorAll<HTMLButtonElement>(`${GEMINI_SELECTORS.answerContainer} ${GEMINI_SELECTORS.injectionPointInAnswer}`).forEach(btn => {
+    if (btn !== shareButton) { // Don't remove from the currently clicked one if it's the one
+        btn.removeAttribute('data-gemini-enhancer-triggered-menu');
+    }
+  });
+
   if (shareButton) {
     // Find the corresponding answer block root
     const answerBlock = shareButton.closest<HTMLElement>(GEMINI_SELECTORS.answerContainer);
     if (answerBlock) {
       console.log("Gemini Export Enhancer: Share button clicked, associated answer block:", answerBlock);
+      shareButton.setAttribute('data-gemini-enhancer-triggered-menu', 'true'); // Mark this button
       lastClickedAnswerBlockRoot = answerBlock; // Store the reference
     } else {
         console.warn("Gemini Export Enhancer: Share button clicked, but couldn't find parent answer block.");
         lastClickedAnswerBlockRoot = null; // Reset if association failed
+        // Ensure the flag is removed if we couldn't find an answer block for this share button
+        shareButton.removeAttribute('data-gemini-enhancer-triggered-menu');
     }
+  } else {
+    // If the click was not on a share button, we don't necessarily clear the lastClickedAnswerBlockRoot
+    // or flags immediately, as a menu might be appearing for a previously clicked valid share button.
+    // The MutationObserver logic will handle validating the flag.
   }
-  // If the click wasn't on a share button, we don't reset lastClickedAnswerBlockRoot here,
-  // because the menu might appear slightly after the click due to event propagation or framework logic.
 }, true); // Use capture phase to catch the click early
 console.log("Gemini Export Enhancer: Global click listener added.");
 // ---
@@ -270,31 +283,41 @@ const mainObserver = new MutationObserver((mutationsList) => {
       mutation.addedNodes.forEach(node => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           const element = node as HTMLElement;
+          let menuPanelToProcess: HTMLElement | null = null;
 
           // Check if the added node *is* the menu panel
           if (element.matches && typeof element.matches === 'function' && element.matches(GEMINI_SELECTORS.shareMenu.menuPanel)) {
+            menuPanelToProcess = element;
             console.log("Gemini Export Enhancer: Share menu panel added directly:", element);
-            if (lastClickedAnswerBlockRoot) {
-              addCustomMenuItems(element, lastClickedAnswerBlockRoot);
-              // Optional: Reset after use to avoid injecting into unrelated menus if timing is off
-              // lastClickedAnswerBlockRoot = null;
-            } else {
-              console.warn("Gemini Export Enhancer: Share menu panel appeared, but no recently clicked answer block was recorded.");
-            }
           }
-          // Check if the added node *contains* the menu panel (less common but possible)
+          // Check if the added node *contains* the menu panel
           else if (element.querySelector) {
-             const menuPanel = element.querySelector<HTMLElement>(GEMINI_SELECTORS.shareMenu.menuPanel);
-             if (menuPanel) {
-                console.log("Gemini Export Enhancer: Share menu panel added within node:", menuPanel);
-                if (lastClickedAnswerBlockRoot) {
-                   addCustomMenuItems(menuPanel, lastClickedAnswerBlockRoot);
-                   // Optional: Reset after use
-                   // lastClickedAnswerBlockRoot = null;
-                } else {
-                   console.warn("Gemini Export Enhancer: Share menu panel appeared (within node), but no recently clicked answer block was recorded.");
-                }
+             const foundPanel = element.querySelector<HTMLElement>(GEMINI_SELECTORS.shareMenu.menuPanel);
+             if (foundPanel) {
+                menuPanelToProcess = foundPanel;
+                console.log("Gemini Export Enhancer: Share menu panel added within node:", menuPanelToProcess);
              }
+          }
+
+          if (menuPanelToProcess && lastClickedAnswerBlockRoot) {
+            const expectedTriggerButton = lastClickedAnswerBlockRoot.querySelector<HTMLButtonElement>(GEMINI_SELECTORS.injectionPointInAnswer);
+            
+            if (expectedTriggerButton && expectedTriggerButton.getAttribute('data-gemini-enhancer-triggered-menu') === 'true') {
+              console.log("Gemini Export Enhancer: Valid trigger for menu panel confirmed.");
+              addCustomMenuItems(menuPanelToProcess, lastClickedAnswerBlockRoot);
+              expectedTriggerButton.removeAttribute('data-gemini-enhancer-triggered-menu'); // Clean up the flag
+              // lastClickedAnswerBlockRoot = null; // Optionally reset to be stricter, uncomment if needed
+            } else {
+              console.warn("Gemini Export Enhancer: Share menu panel appeared, but the trigger button was not the one marked or no answer block associated.");
+              // If the menu appeared but wasn't triggered by our marked button,
+              // we should clear any lingering mark on a button that didn't open this menu.
+              // This case is tricky; the click listener already tries to manage flags.
+              // For now, primarily rely on the positive confirmation.
+            }
+          } else if (menuPanelToProcess) {
+            // Menu panel appeared, but no lastClickedAnswerBlockRoot, or it was cleared.
+            // This is expected if a menu is opened not by our target share buttons.
+            console.log("Gemini Export Enhancer: Share menu panel appeared, but no recently clicked and marked answer block was recorded or it was already processed.");
           }
 
           // Optional: Keep logic to process added answer blocks if needed elsewhere,

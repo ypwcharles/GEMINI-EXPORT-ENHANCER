@@ -239,6 +239,44 @@ const INTERFERING_ELEMENT_SELECTORS = [
   // Add other selectors if needed
 ];
 
+// NEW: Function to recursively transfer computed line-height
+function transferComputedLineHeight(originalNode: Node, clonedNode: Node) {
+    if (originalNode.nodeType === Node.ELEMENT_NODE && clonedNode.nodeType === Node.ELEMENT_NODE) {
+        const originalElement = originalNode as HTMLElement;
+        const clonedElement = clonedNode as HTMLElement;
+
+        // Skip elements within code blocks or code blocks themselves, as they are handled separately
+        if (originalElement.closest('div.code-block') || originalElement.matches('div.code-block')) {
+             // Let applyCanvasFriendlyCodeStyles handle these later
+        } else {
+            try {
+                const computedStyle = window.getComputedStyle(originalElement);
+                const lineHeight = computedStyle.lineHeight;
+
+                // Apply the computed line-height as an inline style to the clone
+                // Only apply if it's a valid, non-zero value. 'normal' might be okay too.
+                if (lineHeight && lineHeight !== '0px') {
+                     clonedElement.style.lineHeight = lineHeight;
+                }
+            } catch (e) {
+                // Getting computed style might fail for some elements (e.g., display: none)
+                console.warn('Could not get computed style for', originalElement, e);
+            }
+
+            // Recurse for child nodes only if we processed this element
+            const originalChildNodes = originalElement.childNodes;
+            const clonedChildNodes = clonedElement.childNodes;
+            // Ensure lengths match (cloneNode should guarantee this, but added safety)
+            const numChildren = Math.min(originalChildNodes.length, clonedChildNodes.length);
+
+            for (let i = 0; i < numChildren; i++) {
+                transferComputedLineHeight(originalChildNodes[i], clonedChildNodes[i]);
+            }
+        }
+    }
+    // We don't need to handle text nodes specifically for line-height
+}
+// END NEW Function
 
 /**
  * Generates an image Blob from a given HTML element using html2canvas,
@@ -260,8 +298,21 @@ export async function generateImageBlob(
 
   const mergedOptions = { ...DEFAULT_STYLES, ...options };
 
-  // 1. Clone the original element AND clean it
+  // 1. Clone the original element
   const cleanedClone = element.cloneNode(true) as HTMLElement;
+
+  // --- NEW: Transfer computed line-height from original to clone ---
+  try {
+      console.log("Transferring computed line-height...");
+      transferComputedLineHeight(element, cleanedClone);
+      console.log("Finished transferring computed line-height.");
+  } catch (e) {
+      console.error("Error transferring computed line-height:", e);
+      // Proceed anyway, but log the error
+  }
+  // --- END NEW ---
+
+  // 1.b Clean the clone (AFTER transferring styles if needed)
   INTERFERING_ELEMENT_SELECTORS.forEach(selector => {
     cleanedClone.querySelectorAll(selector).forEach(el => el.remove());
   });
