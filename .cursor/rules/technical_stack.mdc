@@ -7,21 +7,19 @@ alwaysApply: false
 
 **1. 引言**
 
-本文档详细说明了为"Gemini 内容导出与美化插件"项目确定的技术栈。该选择旨在平衡开发效率、性能、可维护性、社区支持以及与目标浏览器（Chrome, Edge）的兼容性，并深度整合 `markdown-to-image` ([https://github.com/gcui-art/markdown-to-image](mdc:https:/github.com/gcui-art/markdown-to-image)) 项目的优势。
+本文档详细说明了为"Gemini 内容导出与美化插件"项目确定的技术栈。该选择旨在平衡开发效率、性能、可维护性、社区支持以及与目标浏览器（Chrome, Edge）的兼容性。
 
 **2. 核心前端技术**
 
 *   **HTML5 (HyperText Markup Language 5)**
-    *   **用途**: 构建插件所有用户界面的结构，包括注入到 Gemini 页面的按钮、弹出菜单以及海报编辑器的 Web UI。
+    *   **用途**: 构建插件所有用户界面的结构，包括注入到 Gemini 页面的按钮、弹出菜单等。
     *   **理由**: Web 开发的基石，所有浏览器原生支持。
 *   **CSS3 (Cascading Style Sheets 3)**
-    *   **用途**: 负责插件所有 UI 元素的样式和布局。
-        *   对于**海报编辑器 Web UI**，将采用 **Tailwind CSS** 以便与 `markdown-to-image` 项目的实践保持一致，并利用其高效的原子化 CSS 开发模式。
-        *   对于插件注入的简单 UI 元素（如按钮），可使用原生 CSS 或同样采用 Tailwind CSS 以求风格统一。
+    *   **用途**: 负责插件所有 UI 元素的样式和布局。可使用 **Tailwind CSS** 以便快速开发和保持风格统一。
     *   **理由**: Web 开发的标准样式语言。Tailwind CSS 提供快速 UI 构建能力。
 *   **TypeScript (基于 ECMAScript 2015+ / ES6+)**
-    *   **用途**: 作为主要的编程语言，在 JavaScript 基础上增加静态类型检查。用于实现插件的所有动态行为和逻辑，包括 DOM 操作、浏览器 API 交互、事件处理、Markdown 与图片转换逻辑调用、海报编辑器交互功能等。
-    *   **理由**: 提高代码质量、可维护性和可重构性，减少运行时错误。`markdown-to-image` 项目也使用了 TypeScript，保持一致性。
+    *   **用途**: 作为主要的编程语言，在 JavaScript 基础上增加静态类型检查。用于实现插件的所有动态行为和逻辑，包括 DOM 操作、浏览器 API 交互、事件处理、Markdown 与图片转换逻辑调用等。
+    *   **理由**: 提高代码质量、可维护性和可重构性，减少运行时错误。
 
 **3. 浏览器扩展框架与 API**
 
@@ -45,7 +43,7 @@ alwaysApply: false
 
 *   **4.1. HTML/DOM 到图片转换**
     *   **选定库**: `html2canvas`
-        *   **用途**: 将 Gemini 页面的选定内容 (DOM 元素) 或 Web UI 编辑器中的预览内容渲染成 Canvas，然后导出为图片 (PNG/JPEG)。
+        *   **用途**: 将 Gemini 页面的选定内容 (DOM 元素) 渲染成 Canvas，然后导出为图片 (PNG/JPEG)。
         *   **理由**: 较为成熟和广泛使用的客户端 HTML 到 Canvas 渲染库。
 
 *   **4.2. HTML 到 Markdown 转换**
@@ -53,28 +51,16 @@ alwaysApply: false
         *   **用途**: 将从 Gemini 页面捕获的 HTML 内容转换为 Markdown 文本。
         *   **理由**: 流行且功能强大的 HTML 到 Markdown 转换库，支持 GFM 和自定义规则。
 
-*   **4.3. Markdown 到图片海报 (Web UI 编辑器核心)**
-    *   **核心技术方案**: 基于 `markdown-to-image` (GitHub: `gcui-art/markdown-to-image` - [https://github.com/gcui-art/markdown-to-image](mdc:https:/github.com/gcui-art/markdown-to-image))
-        *   **用途**: 利用其提供的 React 组件 (`Md2Poster`) 将 Markdown 渲染为美观的海报图片，并参考其 Web 编辑器实现自定义编辑功能。
-        *   **理由**: 直接命中了需求的核心，其提供的 React 组件和 Web 编辑器示例是实现此功能的最佳基础。
-        *   **集成方式**: 直接集成其 React 组件，并根据本项目需求进行定制开发和功能扩展。
-
-*   **4.4. Web UI 编辑器技术栈**
-    *   **选定框架**: **React**
-        *   **用途**: 构建海报编辑器的用户界面。
-        *   **理由**: 最大化复用 `markdown-to-image` ([https://github.com/gcui-art/markdown-to-image](mdc:https:/github.com/gcui-art/markdown-to-image)) 项目的 React 组件 (`Md2Poster`)，减少重复开发，快速实现核心海报生成与编辑功能。
-        *   **备选 (轻量化)**: **Preact** (React API 兼容) 可以在项目后期对包体积有极致要求时考虑替换，开发初期以 React 为主。
-
 **5. 构建与开发工具**
 
 *   **包管理器**:
     *   **选定工具**: `pnpm`
     *   **用途**: 管理项目依赖。
-    *   **理由**: 在磁盘空间和安装速度上有优势。`markdown-to-image` 项目也使用了 `pnpm`，保持一致性。
+    *   **理由**: 在磁盘空间和安装速度上有优势。
 *   **构建/打包工具**:
     *   **选定工具**: `Vite`
         *   **用途**: 现代前端构建工具，提供极速的冷启动、即时模块热更新 (HMR) 和优化的构建输出。
-        *   **理由**: 开发体验极佳，与 React 集成良好，对 TypeScript 原生支持。`markdown-to-image` 项目也使用了 `Vite`，保持一致性。
+        *   **理由**: 开发体验极佳，与 React (如果用于 Popup 或其他 UI) 集成良好，对 TypeScript 原生支持。
 *   **代码检查与格式化**:
     *   `ESLint`:
         *   **用途**: TypeScript 代码静态分析。
@@ -100,10 +86,93 @@ alwaysApply: false
 本技术栈明确了以下核心选择：
 
 *   **语言**: TypeScript
-*   **UI 框架 (编辑器)**: React (优先考虑集成 `markdown-to-image` 组件)
-*   **CSS (编辑器)**: Tailwind CSS
-*   **核心库**: `html2canvas` (DOM 转图), `Turndown` (HTML 转 MD), `markdown-to-image` (MD 转海报核心)
+*   **核心库**: `html2canvas` (DOM 转图), `Turndown` (HTML 转 MD), `React` (UI 组件与渲染), `@heroicons/react` (图标), `sonner` (Toast 通知)
 *   **构建工具链**: Vite + pnpm
 *   **浏览器扩展标准**: Manifest V3
+*   **UI 框架/库 (Content Script)**: 直接 DOM 操作结合 `ReactDOM.createRoot` 渲染图标和 Toaster。
 
-此选型旨在最大化利用现有优秀开源项目 (`markdown-to-image`)，并结合现代前端开发实践，高效构建高质量的浏览器插件。
+此选型旨在结合现代前端开发实践，高效构建高质量的浏览器插件。
+
+**8. 关键 API 和方法调用细节**
+
+本章节旨在详细列出项目开发过程中使用的核心 API 接口及关键方法的调用方式与注意事项，为后续开发和维护提供具体参考。
+
+*   **8.1. 浏览器扩展 API (Manifest V3)**
+    *   **`manifest.json` 关键权限**:
+        *   `storage`: (可能未使用，但已声明) 用于 `chrome.storage` API。
+        *   `activeTab`: 允许在用户交互时访问当前活动标签页，通常与 `scripting` 结合。
+        *   `scripting`: 核心权限，允许插件通过 `chrome.scripting` API 在页面上执行脚本或插入 CSS。
+        *   `clipboardWrite`: 关键权限，允许使用 `navigator.clipboard.writeText()` 和 `navigator.clipboard.write()` 向系统剪贴板写入文本和图片。
+        *   `downloads`: (如果使用 `chrome.downloads` API，例如替代 `<a>` 标签下载法时需要)。
+        *   `host_permissions`: 明确授权插件在 `*://gemini.google.com/*` 页面运行。
+    *   **内容脚本 (`content.tsx`) 核心交互**:
+        *   **DOM 注入**:
+            *   使用 `MutationObserver` 监听 Gemini 页面的 `document.body` 或特定容器的变化 (如 `childList: true, subtree: true`)。
+            *   在回调中，使用 `querySelectorAll` 结合 `GEMINI_SELECTORS` (如 `modelResponseContainer`, `shareMenuPanelSelector`) 来查找目标元素 (回答容器、分享菜单面板)。
+            *   动态创建按钮 (`document.createElement('button')`) 和其他元素，并应用样式。
+            *   使用 `ReactDOM.createRoot(iconContainer).render(React.createElement(itemConfig.icon, ...))` 将 `@heroicons/react` 图标渲染到创建的按钮中。
+            *   将创建的自定义菜单项插入到检测到的分享菜单面板 (`shareMenuPanel.insertBefore(button, originalFirstChild)`)。
+            *   包含幂等性检查，避免重复注入 (`shareMenuPanel.querySelector('.gemini-enhancer-custom-item')`)。
+        *   **事件处理**:
+            *   为动态创建的按钮添加 `onclick` 事件监听器。
+            *   事件处理函数 (`async (e) => { ... }`) 调用 `src/content/actions.ts` 中对应的 `handle...` 函数，并传递关联的回答块根元素 (`answerBlockRoot`)。
+            *   使用 `e.stopPropagation()` 和 `e.preventDefault()` 防止事件冒泡和默认行为。
+        *   **DOM 查询**:
+            *   广泛使用 `querySelector` 和 `querySelectorAll` 配合 `GEMINI_SELECTORS` 中的选择器 (`answerContent`, `answerContentFallbacks`) 来定位回答内容元素。
+    *   **剪贴板操作 (`src/content/actions.ts`)**:
+        *   `navigator.clipboard.writeText(markdownString)`: 用于复制 Markdown 文本。包含 `.then()` 处理成功和 `.catch()` 处理失败的逻辑。
+        *   (已包含) 提供了 `document.execCommand('copy')` 作为 `writeText` 失败时的后备方案。
+        *   `navigator.clipboard.write([new ClipboardItem({ 'image/png': imageBlob })])`: 用于将 `html2canvas` 生成的 PNG 图片 `Blob` 复制到剪贴板。
+    *   **下载操作 (`src/content/actions.ts`)**:
+        *   使用辅助函数 `triggerDownload(blob, filename)` 实现。
+        *   内部逻辑:
+            1.  `new Blob([markdownContent], { type: 'text/markdown' })` 创建 Markdown Blob。
+            2.  `canvas.toBlob((blob) => {...}, 'image/png')` 获取图片 Blob (在 `imageGenerator.ts` 中)。
+            3.  `URL.createObjectURL(blob)` 创建对象 URL。
+            4.  创建 `<a>` 元素，设置 `href` 为对象 URL，`download` 为包含日期时间戳的文件名 (`Gemini-Export-YYYY-MM-DD_HH-MM.md/.png`)。
+            5.  `document.body.appendChild(link)` -> `link.click()` -> `document.body.removeChild(link)` 模拟点击下载。
+            6.  `setTimeout(() => URL.revokeObjectURL(url), 10000)` 延迟释放对象 URL。
+    *   **用户反馈 (`content.tsx`, `actions.ts`)**:
+        *   使用 `sonner` 库的 `toast.success()`, `toast.error()`, `toast.info()` 提供操作反馈。
+        *   在 `content.tsx` 初始化时，创建 `toasterContainer` div 并使用 `ReactDOM.createRoot().render(<Toaster ... />)` 渲染 Toaster 组件。
+
+*   **8.2. 核心库方法**
+    *   **`html2canvas (element: HTMLElement, options?: Partial<Options>): Promise<HTMLCanvasElement>` (`html2canvas` 库, 在 `src/core/imageGenerator.ts`)**:
+        *   **调用时机**: 在 `generateImageBlob` 函数内部，对经过复杂预处理和包装的 DOM 元素 (`elementToCaptureInIframe`) 进行调用。
+        *   **执行上下文**: 在动态创建的 `iframe` 内部执行，以隔离样式和提高稳定性。
+        *   **关键预处理 (`generateImageBlob` 内)**:
+            *   **克隆与清理**: 克隆原始元素，移除干扰元素 (`script`, `iframe`, `on*` 事件处理器)。
+            *   **样式应用**: 调用 `applyCanvasFriendlyCodeStyles` 对克隆体内的代码块应用大量直接样式修改 (背景、颜色、填充、行高、字体、隐藏头部、计算高度等)；调用 `forceStyles` 应用通用样式；调用 `transferComputedLineHeight` 尝试同步原始行高。
+            *   **结构包装**: 将处理后的克隆体放入包含标题、卡片背景、内边距、阴影、圆角和页脚的 `captureWrapper` 和 `card` 结构中。
+            *   **Iframe 注入**: 将 `captureWrapper.outerHTML` 注入到 iframe 的 `body`。
+            *   **尺寸调整与延迟**: 调整 iframe 尺寸以适应内容 (`scrollHeight`, `scrollWidth`)，并在调用 `html2canvas` 前加入少量延迟 (`setTimeout(..., 100)`).
+        *   **`html2canvas` 选项**:
+            *   `useCORS: true` (默认)
+            *   `logging: false` (默认)
+            *   `backgroundColor: null` (让 `captureWrapper` 的背景生效)
+            *   `scale`: 使用 `ImageStyleOptions` 中的 `scale` 或 `window.devicePixelRatio` (优先)。
+            *   **未设置**显式的 `width`, `height`, `windowWidth`, `windowHeight`，依赖于 iframe 和内容的自然尺寸。
+        *   **输出**: `canvas.toBlob((blob) => { ... }, 'image/png')` 将结果转换为 Blob。
+    *   **`TurndownService` (`turndown` 库, 在 `src/core/markdownConverter.ts`)**:
+        *   **实例化**: `new TurndownService({ ... })`
+        *   **配置**:
+            *   `codeBlockStyle: 'fenced'`
+            *   `headingStyle: 'atx'`
+            *   `bulletListMarker: '-'`
+            *   `linkStyle: 'inlined'`
+        *   **插件**: `turndownService.use(gfm)` 应用 GitHub Flavored Markdown 插件。
+        *   **转换**: `turndownService.turndown(htmlString)` 执行转换。
+        *   **(潜在) 自定义规则**: 包含注释掉的 `addRule` 示例，展示如何处理特定 HTML 结构 (如 `<pre class="gemini-code-block">`)。
+    *   **`React` & `ReactDOM` (库)**:
+        *   **用途**: 主要用于渲染 UI 片段 (如 `@heroicons/react` 图标、`sonner` Toaster) 到内容脚本动态创建的 DOM 容器中。
+        *   **挂载图标**: `ReactDOM.createRoot(iconContainer).render(React.createElement(itemConfig.icon, { style: ... }))`
+        *   **挂载 Toaster**: `ReactDOM.createRoot(toasterContainer).render(<React.StrictMode><Toaster richColors position="bottom-right" /></React.StrictMode>)`
+        *   **UI 组件库**: 使用 `@/components/ui/sonner` (可能是 `shadcn/ui` 的 Sonner 封装) 和 `@heroicons/react`。
+
+*   **8.3. 客户端文件与数据操作** (细节已在 8.1 的下载操作中描述)
+    *   `Blob`: 用于创建 Markdown 文件内容或接收 `canvas.toBlob` 的图片数据。
+    *   `URL.createObjectURL()`: 为 Blob 创建可供下载的 URL。
+    *   `<a>` 标签下载技巧: 标准的客户端文件下载实现方法。
+    *   `URL.revokeObjectURL()`: 释放不再需要的对象 URL。
+
+以上总结旨在覆盖项目中的主要技术点和实现方式，为后续的开发迭代提供便利。

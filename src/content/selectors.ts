@@ -90,19 +90,25 @@ export const GEMINI_SELECTORS = {
    */
   deepDiveReport: {
     /**
+     * 深度研究面板的顶层标识元素
+     */
+    deepResearchPanel: 'deep-research-immersive-panel',
+
+    /**
      * 深度研究报告的容器元素
      */
     container: '.toolbar.has-title',
 
     /**
      * 用于定位"深度研究"报告中我们想要注入自定义按钮的区域
+     * 将会注入到 .action-buttons 中，此选择器指向作为参照的 "Export to Docs" 按钮
      */
-    injectionPoint: '.action-buttons copy-button',
+    injectionPoint: 'export-to-docs-button[data-test-id="export-to-docs-button"]',
 
     /**
      * 用于定位深度研究报告内容本身，以便提取HTML
      */
-    content: '.deep-dive-report-content',
+    content: 'message-content[data-test-id="message-content"]',
 
     /**
      * 滚动容器元素

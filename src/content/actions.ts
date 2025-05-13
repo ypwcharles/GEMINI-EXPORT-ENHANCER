@@ -23,13 +23,23 @@ export function triggerDownload(blob: Blob, filename: string) {
 }
 
 // Action: Copy as Markdown
-export async function handleCopyMarkdown(blockRoot: HTMLElement): Promise<void> {
-  console.log('Action started: Copy MD for block:', blockRoot);
-  let contentElement = blockRoot.querySelector(GEMINI_SELECTORS.answerContent);
-  if (!contentElement) {
+export async function handleCopyMarkdown(
+  blockRoot: HTMLElement,
+  contentSelectorOverride?: string
+): Promise<void> {
+  console.log('Action started: Copy MD for block:', blockRoot, 'Selector override:', contentSelectorOverride);
+  let contentElement: Element | null = null;
+  const mainSelector = contentSelectorOverride || GEMINI_SELECTORS.answerContent;
+
+  contentElement = blockRoot.querySelector(mainSelector);
+
+  if (!contentElement && !contentSelectorOverride) { // Only try fallbacks if not using an override
     for (const fallbackSelector of GEMINI_SELECTORS.answerContentFallbacks) {
       contentElement = blockRoot.querySelector(fallbackSelector);
-      if (contentElement) break;
+      if (contentElement) {
+        console.log('Found content with fallback selector:', fallbackSelector);
+        break;
+      }
     }
   }
 
@@ -60,19 +70,29 @@ export async function handleCopyMarkdown(blockRoot: HTMLElement): Promise<void> 
       }
     }
   } else {
-    console.error('Could not find content element for Copy MD using any selector');
+    console.error('Could not find content element for Copy MD using selector:', mainSelector, 'and fallbacks (if applicable)');
     toast.error('无法找到内容元素', { description: '无法复制Markdown，请检查控制台。' });
   }
 }
 
 // Action: Download as Markdown
-export async function handleDownloadMarkdown(blockRoot: HTMLElement): Promise<void> {
-  console.log('Action started: Download MD for block:', blockRoot);
-  let contentElement = blockRoot.querySelector(GEMINI_SELECTORS.answerContent);
-  if (!contentElement) {
+export async function handleDownloadMarkdown(
+  blockRoot: HTMLElement,
+  contentSelectorOverride?: string
+): Promise<void> {
+  console.log('Action started: Download MD for block:', blockRoot, 'Selector override:', contentSelectorOverride);
+  let contentElement: Element | null = null;
+  const mainSelector = contentSelectorOverride || GEMINI_SELECTORS.answerContent;
+
+  contentElement = blockRoot.querySelector(mainSelector);
+
+  if (!contentElement && !contentSelectorOverride) { // Only try fallbacks if not using an override
     for (const fallbackSelector of GEMINI_SELECTORS.answerContentFallbacks) {
       contentElement = blockRoot.querySelector(fallbackSelector);
-      if (contentElement) break;
+      if (contentElement) {
+        console.log('Found content with fallback selector:', fallbackSelector);
+        break;
+      }
     }
   }
 
@@ -91,19 +111,29 @@ export async function handleDownloadMarkdown(blockRoot: HTMLElement): Promise<vo
       toast.error('下载 Markdown 时出错', { description: error?.message });
     }
   } else {
-    console.error('Could not find content element for Download MD');
+    console.error('Could not find content element for Download MD using selector:', mainSelector, 'and fallbacks (if applicable)');
     toast.error('无法找到内容元素', { description: '无法下载Markdown，请检查控制台。' });
   }
 }
 
 // Action: Copy as Image
-export async function handleCopyImage(blockRoot: HTMLElement): Promise<void> {
-  console.log('Action started: Copy Image for block:', blockRoot);
-  let contentElement = blockRoot.querySelector(GEMINI_SELECTORS.answerContent);
-  if (!contentElement) {
+export async function handleCopyImage(
+  blockRoot: HTMLElement,
+  contentSelectorOverride?: string
+): Promise<void> {
+  console.log('Action started: Copy Image for block:', blockRoot, 'Selector override:', contentSelectorOverride);
+  let contentElement: Element | null = null;
+  const mainSelector = contentSelectorOverride || GEMINI_SELECTORS.answerContent;
+
+  contentElement = blockRoot.querySelector(mainSelector);
+
+  if (!contentElement && !contentSelectorOverride) {
     for (const fallbackSelector of GEMINI_SELECTORS.answerContentFallbacks) {
       contentElement = blockRoot.querySelector(fallbackSelector);
-      if (contentElement) break;
+      if (contentElement) {
+        console.log('Found content with fallback selector:', fallbackSelector);
+        break;
+      }
     }
   }
 
@@ -121,19 +151,29 @@ export async function handleCopyImage(blockRoot: HTMLElement): Promise<void> {
       toast.error('复制图片时出错', { description: error?.message });
     }
   } else {
-    console.error('Could not find content element for Copy Image');
+    console.error('Could not find content element for Copy Image using selector:', mainSelector, 'and fallbacks (if applicable)');
     toast.error('无法找到内容元素', { description: '无法复制图片，请检查控制台。' });
   }
 }
 
 // Action: Download as Image
-export async function handleDownloadImage(blockRoot: HTMLElement): Promise<void> {
-  console.log('Action started: Download Image for block:', blockRoot);
-  let contentElement = blockRoot.querySelector(GEMINI_SELECTORS.answerContent);
-  if (!contentElement) {
+export async function handleDownloadImage(
+  blockRoot: HTMLElement,
+  contentSelectorOverride?: string
+): Promise<void> {
+  console.log('Action started: Download Image for block:', blockRoot, 'Selector override:', contentSelectorOverride);
+  let contentElement: Element | null = null;
+  const mainSelector = contentSelectorOverride || GEMINI_SELECTORS.answerContent;
+
+  contentElement = blockRoot.querySelector(mainSelector);
+
+  if (!contentElement && !contentSelectorOverride) {
     for (const fallbackSelector of GEMINI_SELECTORS.answerContentFallbacks) {
       contentElement = blockRoot.querySelector(fallbackSelector);
-      if (contentElement) break;
+      if (contentElement) {
+        console.log('Found content with fallback selector:', fallbackSelector);
+        break;
+      }
     }
   }
 
@@ -155,7 +195,7 @@ export async function handleDownloadImage(blockRoot: HTMLElement): Promise<void>
       toast.error('下载图片时出错', { description: error?.message });
     }
   } else {
-    console.error('Could not find content element for Download Image');
+    console.error('Could not find content element for Download Image using selector:', mainSelector, 'and fallbacks (if applicable)');
     toast.error('无法找到内容元素', { description: '无法下载图片，请检查控制台。' });
   }
 } 

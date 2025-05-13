@@ -29,7 +29,10 @@ import {
   // triggerDownload // Not directly needed if actions handle it
 } from './actions';
 
-console.log("Gemini Export Enhancer: Script start. Mode: Inject into Share Menu via panel detection.");
+// Import from the new observer file
+import { initializeDeepResearchObserver, setAddCustomMenuItemsUtility } from './deepResearchObserver';
+
+console.log("Gemini Export Enhancer: Script start. Mode: Inject into Share Menu & Deep Research Toolbar.");
 
 // Create a container for the Toaster and render it once.
 let toasterContainer: HTMLElement | null = null;
@@ -98,23 +101,28 @@ const S_MENU_ITEM_LABELS = {
   },
 };
 
-// Helper function to get the localized label
-function getLocalizedLabel(actionKey: keyof typeof S_MENU_ITEM_LABELS, pageLang: string): string {
+// Helper function to get the localized label - EXPORT this function
+export function getLocalizedLabel(actionKey: keyof typeof S_MENU_ITEM_LABELS, pageLang: string): string {
   const lang = pageLang.toLowerCase().startsWith('zh') ? 'zh' : 'en';
-  return S_MENU_ITEM_LABELS[actionKey][lang] || S_MENU_ITEM_LABELS[actionKey]['en']; // Fallback to English
+  return S_MENU_ITEM_LABELS[actionKey][lang] || S_MENU_ITEM_LABELS[actionKey]['en']; 
 }
 
-// --- Global State for associating click with menu ---
+// --- Global State for associating click with share menu ---
 let lastClickedAnswerBlockRoot: HTMLElement | null = null;
 // ---
 
-function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLElement) {
-  // Idempotency check: If custom items already exist, do nothing.
-  if (shareMenuPanel.querySelector('.gemini-enhancer-custom-item')) {
+// MODIFIED and EXPORTED addCustomMenuItems function
+export function addCustomMenuItems(
+  menuPanel: HTMLElement, 
+  answerBlockRoot: HTMLElement,
+  contentSelectorForActions?: string, // New parameter for specific content selector
+  closeMenuCallback?: () => void // New parameter for custom close callback
+) {
+  if (menuPanel.querySelector('.gemini-enhancer-custom-item')) {
     console.log("Gemini Export Enhancer: Custom items already exist in this menu panel. Skipping injection.");
     return;
   }
-  console.log("Gemini Export Enhancer: Adding custom menu items to panel, associated with answer block:", answerBlockRoot);
+  console.log("Gemini Export Enhancer: Adding custom menu items to panel:", menuPanel, "associated with block:", answerBlockRoot, "selector override:", contentSelectorForActions);
 
   const pageLang = document.documentElement.lang || 'en';
   const actionHandlers = {
@@ -123,7 +131,7 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
     copyMarkdown: handleCopyMarkdown,
     downloadMarkdown: handleDownloadMarkdown,
   };
-  const originalFirstChild = shareMenuPanel.firstChild;
+  const originalFirstChild = menuPanel.firstChild;
 
   MENU_ITEMS_CONFIG.forEach(itemConfig => {
     const button = document.createElement('button');
@@ -143,14 +151,26 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
     button.style.fontSize = '14px';
     button.style.fontFamily = 'inherit';
 
-    const nativeMenuButton = shareMenuPanel.querySelector('button[mat-menu-item]');
-    button.style.color = nativeMenuButton ? getComputedStyle(nativeMenuButton).color : 'rgb(32, 33, 36)';
-
-    // Hover effect with Dark Mode detection
+    const nativeMenuButton = menuPanel.querySelector('button[mat-menu-item]');
+    // Determine text and icon colors based on theme
     const isDarkMode = document.documentElement.getAttribute('dark') === 'true' ||
                        document.documentElement.classList.contains('dark') ||
                        (window.getComputedStyle(document.body).backgroundColor &&
                         parseInt(window.getComputedStyle(document.body).backgroundColor.split('(')[1]) < 128);
+
+    let itemTextColor: string;
+    let itemIconColor: string;
+
+    if (isDarkMode) {
+      itemTextColor = 'rgb(232, 234, 237)'; // Light gray for dark mode text
+      itemIconColor = 'rgb(232, 234, 237)'; // Light gray for dark mode icons
+    } else {
+      itemTextColor = nativeMenuButton ? getComputedStyle(nativeMenuButton).color : 'rgb(32, 33, 36)';
+      itemIconColor = 'rgb(32, 33, 36)'; // Dark gray for light mode icons
+    }
+    button.style.color = itemTextColor;
+
+    // Hover effect with Dark Mode detection
     const lightModeHoverBg = 'rgba(0, 0, 0, 0.04)';
     const darkModeHoverBg = 'rgba(255, 255, 255, 0.1)';
     button.onmouseenter = () => {
@@ -166,13 +186,14 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
     iconContainer.style.display = 'flex';
     iconContainer.style.alignItems = 'center';
     const iconRoot = ReactDOM.createRoot(iconContainer);
-    iconRoot.render(React.createElement(itemConfig.icon, { style: { width: '20px', height: '20px' } }));
+    // Use the dynamically determined itemIconColor
+    iconRoot.render(React.createElement(itemConfig.icon, { style: { width: '20px', height: '20px', color: itemIconColor } }));
     button.appendChild(iconContainer);
 
     // Create and append Text (with specific fontWeight and localized label)
     const textSpan = document.createElement('span');
     textSpan.textContent = getLocalizedLabel(itemConfig.id, pageLang);
-    const nativeMenuItemText = shareMenuPanel.querySelector('button[mat-menu-item] span.mat-mdc-menu-item-text');
+    const nativeMenuItemText = menuPanel.querySelector('button[mat-menu-item] span.mat-mdc-menu-item-text');
     if (nativeMenuItemText) {
       textSpan.style.fontWeight = getComputedStyle(nativeMenuItemText as HTMLElement).fontWeight;
     } else {
@@ -180,13 +201,12 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
     }
     button.appendChild(textSpan);
 
-    // Onclick Handler
     const actionToPerform = actionHandlers[itemConfig.id];
     button.onclick = async (e) => {
-      console.log(`Gemini Export Enhancer: Custom button '${textSpan.textContent}' CLICKED.`);
+      console.log(`Gemini Export Enhancer: Custom button '${textSpan.textContent}' CLICKED. Selector for action: ${contentSelectorForActions}`);
       e.stopPropagation();
       e.preventDefault();
-      // Store answerBlockRoot locally in case it changes globally before async op finishes
+      
       const currentAnswerBlockRoot = answerBlockRoot;
       if (!currentAnswerBlockRoot) {
            console.error("Gemini Export Enhancer: Cannot perform action, associated answer block is missing.");
@@ -194,30 +214,36 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
            return;
       }
       try {
-        await actionToPerform(currentAnswerBlockRoot);
+        // Pass the contentSelectorForActions to the action handler
+        await actionToPerform(currentAnswerBlockRoot, contentSelectorForActions);
       } catch (error) {
         console.error(`Gemini Export Enhancer: Error executing ${itemConfig.id}:`, error);
         toast.error('操作失败', { description: '执行操作时发生未知错误。' });
       }
-      // Attempt to close menu
-      setTimeout(() => {
-          const menuPanelToClose = document.querySelector(GEMINI_SELECTORS.shareMenu.menuPanel) as HTMLElement;
-          if (menuPanelToClose && menuPanelToClose.offsetParent !== null) {
-              try {
-                  const cdkBackdrop = document.querySelector('.cdk-overlay-backdrop');
-                  if (cdkBackdrop && cdkBackdrop instanceof HTMLElement) { cdkBackdrop.click(); return; }
-                  document.body.click();
-              } catch (closeError) { console.error("Error attempting to close menu panel:", closeError); }
-          }
-       }, 100);
+      
+      // Use closeMenuCallback if provided, otherwise use default logic for native share menu
+      if (closeMenuCallback) {
+        setTimeout(closeMenuCallback, 100);
+      } else {
+        setTimeout(() => {
+            const nativeMenuPanelToClose = document.querySelector(GEMINI_SELECTORS.shareMenu.menuPanel) as HTMLElement;
+            // Ensure we are closing the *correct* native menu if multiple could exist, though usually only one is open.
+            if (nativeMenuPanelToClose && nativeMenuPanelToClose === menuPanel && nativeMenuPanelToClose.offsetParent !== null) {
+                try {
+                    const cdkBackdrop = document.querySelector('.cdk-overlay-backdrop');
+                    if (cdkBackdrop && cdkBackdrop instanceof HTMLElement) { cdkBackdrop.click(); return; }
+                    document.body.click(); // Fallback to close generic popups
+                } catch (closeError) { console.error("Error attempting to close native menu panel:", closeError); }
+            }
+         }, 100);
+      }
     };
 
-    shareMenuPanel.prepend(button);
-    console.log(`Gemini Export Enhancer: Prepended '${textSpan.textContent}'`);
+    menuPanel.prepend(button);
   });
 
   // Add Divider after all custom items
-  const customItems = shareMenuPanel.querySelectorAll('.gemini-enhancer-custom-item');
+  const customItems = menuPanel.querySelectorAll('.gemini-enhancer-custom-item');
   const lastPrependedItem = customItems[customItems.length - 1];
   if (lastPrependedItem && lastPrependedItem.nextSibling) {
       if (!(lastPrependedItem.nextSibling instanceof HTMLElement && lastPrependedItem.nextSibling.tagName.toLowerCase() === 'mat-divider')) {
@@ -225,59 +251,54 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
             newDivider.setAttribute('role', 'separator');
             newDivider.style.borderTop = '1px solid rgba(0,0,0,0.12)';
             newDivider.style.margin = '8px 0';
-            shareMenuPanel.insertBefore(newDivider, lastPrependedItem.nextSibling);
+            menuPanel.insertBefore(newDivider, lastPrependedItem.nextSibling);
       }
   } else if (lastPrependedItem && !lastPrependedItem.nextSibling && originalFirstChild) {
        const newDivider = document.createElement('mat-divider');
         newDivider.setAttribute('role', 'separator');
         newDivider.style.borderTop = '1px solid rgba(0,0,0,0.12)';
         newDivider.style.margin = '8px 0';
-        shareMenuPanel.appendChild(newDivider);
+        menuPanel.appendChild(newDivider);
   }
 }
 
-// --- Global Click Listener to identify target answer block ---
+// Provide the modified addCustomMenuItems to the observer module
+setAddCustomMenuItemsUtility(addCustomMenuItems);
+
+// --- Global Click Listener for regular share menu (remains largely the same) ---
 document.addEventListener('click', (event) => {
   const target = event.target as HTMLElement;
-  // Check if the click originated from within our custom menu items - if so, ignore.
-  if (target.closest('.gemini-enhancer-custom-item')) {
+  if (target.closest('.gemini-enhancer-custom-item') || target.closest('.gemini-enhancer-deep-research-export-trigger') || target.closest('.gemini-enhancer-custom-menu-panel')) {
+    // If click is within any of our custom UI, let their handlers manage it.
     return;
   }
 
-  // Check if the clicked element *is* or *is inside* the original share button
   const shareButton = target.closest<HTMLButtonElement>(GEMINI_SELECTORS.injectionPointInAnswer);
   
-  // First, clean up any lingering flags from other buttons
   document.querySelectorAll<HTMLButtonElement>(`${GEMINI_SELECTORS.answerContainer} ${GEMINI_SELECTORS.injectionPointInAnswer}`).forEach(btn => {
-    if (btn !== shareButton) { // Don't remove from the currently clicked one if it's the one
+    if (btn !== shareButton) { 
         btn.removeAttribute('data-gemini-enhancer-triggered-menu');
     }
   });
 
   if (shareButton) {
-    // Find the corresponding answer block root
     const answerBlock = shareButton.closest<HTMLElement>(GEMINI_SELECTORS.answerContainer);
     if (answerBlock) {
-      console.log("Gemini Export Enhancer: Share button clicked, associated answer block:", answerBlock);
-      shareButton.setAttribute('data-gemini-enhancer-triggered-menu', 'true'); // Mark this button
-      lastClickedAnswerBlockRoot = answerBlock; // Store the reference
+      console.log("Gemini Export Enhancer: Share button clicked for regular answer, associated block:", answerBlock);
+      shareButton.setAttribute('data-gemini-enhancer-triggered-menu', 'true'); 
+      lastClickedAnswerBlockRoot = answerBlock; 
     } else {
         console.warn("Gemini Export Enhancer: Share button clicked, but couldn't find parent answer block.");
-        lastClickedAnswerBlockRoot = null; // Reset if association failed
-        // Ensure the flag is removed if we couldn't find an answer block for this share button
+        lastClickedAnswerBlockRoot = null; 
         shareButton.removeAttribute('data-gemini-enhancer-triggered-menu');
     }
-  } else {
-    // If the click was not on a share button, we don't necessarily clear the lastClickedAnswerBlockRoot
-    // or flags immediately, as a menu might be appearing for a previously clicked valid share button.
-    // The MutationObserver logic will handle validating the flag.
-  }
-}, true); // Use capture phase to catch the click early
-console.log("Gemini Export Enhancer: Global click listener added.");
+  } 
+}, true); 
+console.log("Gemini Export Enhancer: Global click listener for regular share menu added.");
 // ---
 
-// --- Main Mutation Observer ---
-const mainObserver = new MutationObserver((mutationsList) => {
+// --- Main Mutation Observer for regular share menu (remains largely the same) ---
+const mainShareMenuObserver = new MutationObserver((mutationsList) => {
   for (const mutation of mutationsList) {
     if (mutation.type === 'childList') {
       mutation.addedNodes.forEach(node => {
@@ -285,72 +306,49 @@ const mainObserver = new MutationObserver((mutationsList) => {
           const element = node as HTMLElement;
           let menuPanelToProcess: HTMLElement | null = null;
 
-          // Check if the added node *is* the menu panel
           if (element.matches && typeof element.matches === 'function' && element.matches(GEMINI_SELECTORS.shareMenu.menuPanel)) {
             menuPanelToProcess = element;
-            console.log("Gemini Export Enhancer: Share menu panel added directly:", element);
           }
-          // Check if the added node *contains* the menu panel
           else if (element.querySelector) {
              const foundPanel = element.querySelector<HTMLElement>(GEMINI_SELECTORS.shareMenu.menuPanel);
              if (foundPanel) {
                 menuPanelToProcess = foundPanel;
-                console.log("Gemini Export Enhancer: Share menu panel added within node:", menuPanelToProcess);
              }
           }
 
           if (menuPanelToProcess && lastClickedAnswerBlockRoot) {
+            // Check if this menuPanel is not part of our custom deep research menu
+            if (menuPanelToProcess.closest('.gemini-enhancer-custom-menu-panel')) {
+                return; // This is our own custom menu, not a native one to inject into.
+            }
+
             const expectedTriggerButton = lastClickedAnswerBlockRoot.querySelector<HTMLButtonElement>(GEMINI_SELECTORS.injectionPointInAnswer);
             
             if (expectedTriggerButton && expectedTriggerButton.getAttribute('data-gemini-enhancer-triggered-menu') === 'true') {
-              console.log("Gemini Export Enhancer: Valid trigger for menu panel confirmed.");
+              console.log("Gemini Export Enhancer: Valid trigger for native share menu panel confirmed.");
+              // Call addCustomMenuItems WITHOUT contentSelectorForActions and WITHOUT closeMenuCallback for native share menu
               addCustomMenuItems(menuPanelToProcess, lastClickedAnswerBlockRoot);
-              expectedTriggerButton.removeAttribute('data-gemini-enhancer-triggered-menu'); // Clean up the flag
-              // lastClickedAnswerBlockRoot = null; // Optionally reset to be stricter, uncomment if needed
-            } else {
-              console.warn("Gemini Export Enhancer: Share menu panel appeared, but the trigger button was not the one marked or no answer block associated.");
-              // If the menu appeared but wasn't triggered by our marked button,
-              // we should clear any lingering mark on a button that didn't open this menu.
-              // This case is tricky; the click listener already tries to manage flags.
-              // For now, primarily rely on the positive confirmation.
-            }
-          } else if (menuPanelToProcess) {
-            // Menu panel appeared, but no lastClickedAnswerBlockRoot, or it was cleared.
-            // This is expected if a menu is opened not by our target share buttons.
-            console.log("Gemini Export Enhancer: Share menu panel appeared, but no recently clicked and marked answer block was recorded or it was already processed.");
-          }
-
-          // Optional: Keep logic to process added answer blocks if needed elsewhere,
-          // but remove the old injection logic from here.
-          // if (element.matches && typeof element.matches === 'function' && element.matches(GEMINI_SELECTORS.answerContainer)) {
-          //   console.log("Gemini Export Enhancer: Detected new answer block:", element);
-          //   // Potentially do something else with the new answer block here if needed
-          // } else {
-          //   const childAnswers = element.querySelectorAll<HTMLElement>(GEMINI_SELECTORS.answerContainer);
-          //   if (childAnswers.length > 0) {
-          //     childAnswers.forEach(answer => console.log("Gemini Export Enhancer: Detected new answer block (within node):", answer));
-          //     // Potentially do something else
-          //   }
-          // }
+              expectedTriggerButton.removeAttribute('data-gemini-enhancer-triggered-menu'); 
+            } 
+          } 
         }
       });
     }
   }
 });
 
-// Observe document.body (same as before)
 if (document.body) {
-    mainObserver.observe(document.body, { childList: true, subtree: true });
-    console.log("Gemini Export Enhancer: Main MutationObserver is now active on document.body (watching for menu panel).");
+    mainShareMenuObserver.observe(document.body, { childList: true, subtree: true });
+    console.log("Gemini Export Enhancer: Main MutationObserver for native share menu is now active.");
 } else {
     document.addEventListener('DOMContentLoaded', () => {
-        mainObserver.observe(document.body, { childList: true, subtree: true });
-        console.log("Gemini Export Enhancer: Main MutationObserver is now active on document.body (DOMContentLoaded, watching for menu panel).");
+        mainShareMenuObserver.observe(document.body, { childList: true, subtree: true });
+        console.log("Gemini Export Enhancer: Main MutationObserver for native share menu is now active (DOMContentLoaded).");
     });
 }
 
-// Removed processAnswerElement function
-// Removed handleShareButtonClick function
+// Initialize the Deep Research Observer
+initializeDeepResearchObserver();
 
 // 后续步骤：
 // 1. 使用 MutationObserver 监听目标元素（如回答容器）的出现
