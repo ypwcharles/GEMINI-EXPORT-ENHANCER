@@ -64,28 +64,169 @@ const DEFAULT_STYLES: Required<Omit<ImageStyleOptions, 'pageTitle' /* removed fo
   backgroundColor: null,
 };
 
-// Helper function to recursively set text color and apply a specific background color
-function forceStyles(
-  element: HTMLElement, // 这个参数将是 cleanedClone
-  cardBackgroundColor: string
-) {
-  // 1. 为 cleanedClone 本身设置一个默认的文本颜色。
-  // 这通常是安全的，有助于确保可读性。
-  if (!element.style.color) {
-    element.style.color = '#333333'; // 一个常用的深灰色
+function applyCanvasFriendlyCodeStyles(codeBlockElement: HTMLElement) {
+  // Hide the header (language label, copy button)
+  const header = codeBlockElement.querySelector<HTMLElement>('.code-block-decoration.header-formatted');
+  if (header) {
+    header.style.display = 'none';
   }
 
-  // 2. 将 cleanedClone 本身的背景色设置为卡片的背景色。
-  // 这很关键，因为如果 cleanedClone 是透明的，html2canvas 可能会将其
-  // 渲染为透明，直接透出 pageGradient，导致文字看不清。
-  element.style.backgroundColor = cardBackgroundColor;
+  // Remove the hidden code-editor container as it might interfere with height calculation
+  const codeEditorContainer = codeBlockElement.querySelector<HTMLElement>('.code-editor-container');
+  if (codeEditorContainer) {
+    codeEditorContainer.remove();
+  }
 
-  // 3. 避免深度递归修改所有子孙元素的 display 属性或背景色。
-  // 这是最可能破坏原始布局的地方。
-  // 我们不再遍历 element.children 去修改它们的样式。
-  // 如果 cleanedClone 内部确实有某些特定元素因为透明背景导致在卡片上不可见，
-  // 那将需要更精确、更少的样式调整，而不是像之前那样"一刀切"。
-  // 目前，我们假设 cleanedClone 内部的元素能正确继承颜色或有自己的样式。
+  // Style the main code block container
+  codeBlockElement.style.backgroundColor = '#2d2d2d'; // Dark gray background
+  codeBlockElement.style.color = '#cccccc';           // Light gray default text
+  codeBlockElement.style.padding = '15px';
+  codeBlockElement.style.borderRadius = '6px';
+  codeBlockElement.style.fontFamily = '"Courier New", Courier, monospace';
+  codeBlockElement.style.setProperty('line-height', '1.5', 'important'); // Ensure line height
+  codeBlockElement.style.overflow = 'auto';          // Manage overflow
+
+  // Explicitly reset padding/margin on the internal container if it exists
+  const internalContainer = codeBlockElement.querySelector<HTMLElement>('.formatted-code-block-internal-container');
+  if (internalContainer) {
+      internalContainer.style.setProperty('padding', '0px', 'important');
+      internalContainer.style.setProperty('margin', '0px', 'important');
+  }
+
+  // Style pre and code tags within this specific code block
+  const preTag = codeBlockElement.querySelector('pre');
+  if (preTag) {
+    preTag.style.margin = '0px'; // Explicitly 0px
+    preTag.style.padding = '0px'; // Explicitly 0px
+    preTag.style.setProperty('margin-left', '0px', 'important');
+    preTag.style.setProperty('padding-left', '0px', 'important');
+    preTag.style.backgroundColor = 'transparent';
+    preTag.style.color = 'inherit';
+    preTag.style.setProperty('line-height', '1.5', 'important');
+    preTag.style.whiteSpace = 'pre-wrap'; // Crucial for spacing and wrapping
+    preTag.style.setProperty('text-indent', '0px', 'important'); // Reset text-indent
+  }
+
+  const codeTag = codeBlockElement.querySelector('code');
+  if (codeTag) {
+    codeTag.style.backgroundColor = 'transparent';
+    codeTag.style.color = 'inherit';
+    codeTag.style.fontFamily = 'inherit';
+    codeTag.style.setProperty('line-height', '1.5', 'important');
+    codeTag.style.whiteSpace = 'pre-wrap';
+    codeTag.style.setProperty('margin', '0px', 'important'); // Reset margin for code tag
+    codeTag.style.setProperty('padding', '0px', 'important'); // Reset padding for code tag
+    codeTag.style.setProperty('text-indent', '0px', 'important'); // Reset text-indent
+
+    // Attempt to trim leading/trailing whitespace/newlines from code content
+    if (codeTag.firstChild && codeTag.firstChild.nodeType === Node.TEXT_NODE) {
+      const replacedValue = codeTag.firstChild.nodeValue?.replace(/^\s*\n?/, '');
+      codeTag.firstChild.nodeValue = replacedValue === undefined ? null : replacedValue;
+    }
+
+    let firstTextNodeTrimmed = false;
+    for (let i = 0; i < codeTag.childNodes.length; i++) {
+      const child = codeTag.childNodes[i];
+      if (child.nodeType === Node.TEXT_NODE && child.nodeValue) {
+        if (!firstTextNodeTrimmed) {
+          const originalLength = child.nodeValue.length;
+          const replacedChildValue = child.nodeValue.replace(/^(\s*\n)+/, '');
+          child.nodeValue = replacedChildValue; // nodeValue can accept string, it will handle null/empty if necessary
+          if (child.nodeValue.length < originalLength) {
+            firstTextNodeTrimmed = true;
+          }
+          if (child.nodeValue.trim().length > 0) { 
+            firstTextNodeTrimmed = true; 
+          }
+        }
+      }
+      else if (child.nodeType !== Node.TEXT_NODE && !firstTextNodeTrimmed) {
+        break; 
+      }
+    }
+  }
+
+  codeBlockElement.querySelectorAll<HTMLElement>('[class*="hljs"]').forEach(span => {
+    span.style.backgroundColor = 'transparent'; 
+  });
+
+  // After all styling, try to set an explicit height to the codeBlockElement
+  // to guide html2canvas and prevent excessive empty space.
+  const preElement = codeBlockElement.querySelector('pre');
+  let calculatedContentHeight = 0;
+
+  if (preElement) {
+    calculatedContentHeight = preElement.scrollHeight;
+  }
+
+  // If preElement's height is 0 or preElement doesn't exist, fallback to codeBlockElement's scrollHeight.
+  if (calculatedContentHeight <= 0) {
+    calculatedContentHeight = codeBlockElement.scrollHeight; 
+  }
+
+  if (calculatedContentHeight > 0) {
+    let finalHeight = calculatedContentHeight;
+    // If the height was derived from preElement, we need to add codeBlockElement's vertical padding.
+    // codeBlockElement was styled with padding: '15px' earlier.
+    if (preElement && preElement.scrollHeight > 0 && preElement.scrollHeight === calculatedContentHeight) { 
+        const computedStyle = window.getComputedStyle(codeBlockElement);
+        const paddingTop = parseFloat(computedStyle.paddingTop);
+        const paddingBottom = parseFloat(computedStyle.paddingBottom);
+        if (!isNaN(paddingTop) && !isNaN(paddingBottom)) {
+            finalHeight = calculatedContentHeight + paddingTop + paddingBottom;
+        }
+    } 
+    // If calculatedContentHeight came from codeBlockElement.scrollHeight, 
+    // it already includes its own padding, so no need to add it again.
+    
+    codeBlockElement.style.height = `${finalHeight}px`;
+    codeBlockElement.style.maxHeight = `${finalHeight}px`;
+    codeBlockElement.style.overflow = 'hidden'; // Ensure no scrollbars appear due to explicit height
+  } else {
+    // Fallback: If height calculation resulted in 0, do not set explicit height and remove overflow:hidden if set by mistake.
+    // This case should be rare.
+    codeBlockElement.style.removeProperty('height');
+    codeBlockElement.style.removeProperty('max-height');
+    codeBlockElement.style.removeProperty('overflow');
+  }
+
+  codeBlockElement.dataset.canvasStyledCodeblock = 'true';
+}
+
+// Modify forceStyles to more reliably skip these blocks
+function forceStyles(
+  element: HTMLElement,
+  cardBackgroundColor: string,
+  isRoot = true
+) {
+  // If it's a code block we've actively restyled, or inside one, stop.
+  if (element.dataset.canvasStyledCodeblock === 'true' || element.closest('[data-canvas-styled-codeblock="true"]')) {
+    return;
+  }
+
+  const genericCodeSelectors = 'code, [class*="hljs"]'; 
+
+  if (!isRoot && element.matches(genericCodeSelectors) && !element.closest('[data-canvas-styled-codeblock="true"]')) {
+      if (!element.style.backgroundColor) { 
+          element.style.backgroundColor = 'rgba(0,0,0,0.05)'; 
+      }
+      return; 
+  }
+
+  if (isRoot) {
+    element.style.backgroundColor = cardBackgroundColor;
+  }
+
+  const currentColor = window.getComputedStyle(element).color;
+  if (!element.style.color &&
+      (!currentColor || currentColor === 'rgba(0, 0, 0, 0)' || currentColor === 'transparent' || currentColor === 'rgb(255, 255, 255)')) {
+     element.style.color = '#333333';
+  }
+
+  const children = element.children;
+  for (let i = 0; i < children.length; i++) {
+    forceStyles(children[i] as HTMLElement, cardBackgroundColor, false);
+  }
 }
 
 // Selector constants for removing interfering elements
@@ -136,11 +277,26 @@ export async function generateImageBlob(
      }
    });
 
-  // Increase line height for readability
-  cleanedClone.style.lineHeight = '2';
+  // The new function applyCanvasFriendlyCodeStyles handles line-height for code blocks,
+  // so the loop below is no longer needed and might conflict.
+  // const codeElements = cleanedClone.querySelectorAll('pre, code');
+  // codeElements.forEach((codeEl: Element) => {
+  //     if (codeEl instanceof HTMLElement) {
+  //         codeEl.style.lineHeight = 'normal'; 
+  //     }
+  // });
 
-  // Force styles on the *cleaned* clone before appending
-  forceStyles(cleanedClone, mergedOptions.cardBackgroundColor);
+  // --- Apply new canvas-friendly styles to ALL code blocks within the clone ---
+  const allCodeBlocksInClone = cleanedClone.querySelectorAll<HTMLElement>('div.code-block');
+  allCodeBlocksInClone.forEach(codeBlockEl => {
+    applyCanvasFriendlyCodeStyles(codeBlockEl);
+  });
+  // --- End of new code block styling ---
+
+  // Force general styles (like card background, default text color for non-code elements)
+  // on the *cleaned* clone before appending it to the wrapper.
+  // forceStyles will skip elements inside data-canvas-styled-codeblock="true"
+  forceStyles(cleanedClone, mergedOptions.cardBackgroundColor, true);
 
   // 2. Create the styled wrapper structure
   const captureWrapper = document.createElement('div');
@@ -185,7 +341,7 @@ export async function generateImageBlob(
   card.style.flexDirection = 'column'; // Stack content vertically
 
 
-  // Append the cleaned clone to the card
+  // Append the modified clone to the card content area
   card.appendChild(cleanedClone);
   captureWrapper.appendChild(card);
 
