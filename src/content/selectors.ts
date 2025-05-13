@@ -13,13 +13,13 @@ export const GEMINI_SELECTORS = {
    * 用于定位回答内容本身，以便提取HTML。
    * 使用多个候选选择器，按优先级排序。
    */
-  answerContent: 'div.response-container-content message-content .markdown',
+  answerContent: 'message-content.model-response-text .markdown',
 
   // 备选选择器，在主选择器失败时尝试
   answerContentFallbacks: [
-    'message-content .markdown',
+    'div.response-container-content message-content .markdown',
+    'message-content[id^="message-content-id-"] .markdown',
     '.response-container-content .markdown',
-    '.model-response-text .markdown',
     '.markdown.markdown-main-panel'
   ],
 
@@ -91,25 +91,37 @@ export const GEMINI_SELECTORS = {
   deepDiveReport: {
     /**
      * 深度研究/沉浸式面板的顶层标识元素
-     * 从 'deep-research-immersive-panel' 改为 'immersive-panel'
      */
-    panelContainer: 'immersive-panel', // 替换了 deepResearchPanel
+    panelContainer: 'immersive-panel',
 
     /**
-     * 深度研究报告的工具栏容器，之前叫做 container，现在确保其值为 'toolbar.extended-response-toolbar'
+     * 深度研究报告的工具栏容器 (主要模式，带 extended 类)
      */
     container: 'toolbar.extended-response-toolbar',
+    /**
+     * 深度研究报告的工具栏容器 (备用模式，直接是 toolbar 标签)
+     */
+    containerFallback: 'deep-research-immersive-panel > toolbar',
 
     /**
-     * 用于定位注入自定义按钮的容器区域 (.action-buttons)
-     * 之前叫做 injectionPoint，现在明确为 injectionPointContainer
+     * 用于定位注入自定义按钮的容器区域 (.action-buttons) (主要模式)
      */
     injectionPointContainer: 'toolbar.extended-response-toolbar .action-buttons',
+    /**
+     * 用于定位注入自定义按钮的容器区域 (.action-buttons) (备用模式)
+     */
+    injectionPointContainerFallback: 'deep-research-immersive-panel > toolbar .action-buttons',
 
     /**
      * 用于定位深度研究/沉浸式报告内容本身，以便提取HTML
      */
     content: 'immersive-editor[data-test-id="immersive-editor"] .ProseMirror',
+
+    /**
+     * 用于定位深度研究/沉浸式报告内容的备选选择器 (当非 immersive-editor 时)
+     * 直接在 deep-research-immersive-panel 下的 message-content > .markdown 结构
+     */
+    contentAlternative: 'deep-research-immersive-panel message-content.message-content-readonly > .markdown.markdown-main-panel',
 
     /**
      * 滚动容器元素 (如果需要)
@@ -156,9 +168,13 @@ export const GEMINI_SELECTORS = {
      */
     toolbar: {
       /**
-       * 工具栏容器
+       * 工具栏容器 (主要/优先使用带 extended 的版本)
        */
-      container: 'toolbar.extended-response-toolbar', // 与外部的 deepDiveReport.container 一致
+      container: 'toolbar.extended-response-toolbar',
+      /**
+       * 工具栏容器 (备用，直接是 toolbar 标签，需配合父级 panel)
+       */
+      containerFallback: 'deep-research-immersive-panel > toolbar',
 
       /**
        * 左侧面板（包含标题和图标）

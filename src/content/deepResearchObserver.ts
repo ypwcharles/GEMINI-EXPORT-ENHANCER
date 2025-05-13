@@ -80,12 +80,21 @@ function handleDeepResearchExportButtonClick(event: MouseEvent, triggerButton: H
     return;
   }
 
-  const pseudoAnswerBlock = document.querySelector(GEMINI_SELECTORS.deepDiveReport.content);
+  let pseudoAnswerBlock = document.querySelector(GEMINI_SELECTORS.deepDiveReport.content); // Try primary selector
+  let contentSelectorForActions = GEMINI_SELECTORS.deepDiveReport.content;
+
   if (!pseudoAnswerBlock) {
-    console.error("Gemini Export Enhancer: Deep research content area not found for menu.");
+    console.log("Gemini Export Enhancer: Primary deep research content selector (", contentSelectorForActions, ") failed, trying alternative...");
+    pseudoAnswerBlock = document.querySelector(GEMINI_SELECTORS.deepDiveReport.contentAlternative);
+    contentSelectorForActions = GEMINI_SELECTORS.deepDiveReport.contentAlternative;
+  }
+
+  if (!pseudoAnswerBlock) {
+    console.error("Gemini Export Enhancer: Deep research content area not found for menu using any selector.");
     toast.error("无法定位深度研究内容");
     return;
   }
+  console.log("Gemini Export Enhancer: Deep research content area found using selector:", contentSelectorForActions, pseudoAnswerBlock);
 
   activeDeepResearchMenuPanel = document.createElement('div');
   activeDeepResearchMenuPanel.classList.add('gemini-enhancer-custom-menu-panel'); 
@@ -110,7 +119,7 @@ function handleDeepResearchExportButtonClick(event: MouseEvent, triggerButton: H
   addCustomMenuItems(
     activeDeepResearchMenuPanel,
     pseudoAnswerBlock.parentElement || pseudoAnswerBlock as HTMLElement, 
-    GEMINI_SELECTORS.deepDiveReport.content,
+    contentSelectorForActions, // Pass the selector that actually worked
     closeDeepResearchMenu // Pass the specific close function for this menu
   );
 
@@ -209,16 +218,30 @@ const deepResearchObserver = new MutationObserver((mutationsList) => {
         document.body.setAttribute('data-gemini-enhancer-deep-research-active', 'true');
         console.log("Gemini Export Enhancer: Deep Research Panel DETECTED & marked active.");
         setTimeout(() => { // Delay to ensure toolbar elements are ready
-          const toolbar = document.querySelector(GEMINI_SELECTORS.deepDiveReport.container);
+          let toolbar = document.querySelector(GEMINI_SELECTORS.deepDiveReport.container);
+          let actionButtonsContainerSelector = GEMINI_SELECTORS.deepDiveReport.injectionPointContainer;
+          let usedPrimarySelectors = true;
+
+          if (!toolbar) {
+            console.log("Gemini Export Enhancer: Primary toolbar selector (container) failed, trying fallback...");
+            toolbar = document.querySelector(GEMINI_SELECTORS.deepDiveReport.containerFallback);
+            actionButtonsContainerSelector = GEMINI_SELECTORS.deepDiveReport.injectionPointContainerFallback;
+            usedPrimarySelectors = false;
+          }
+
           if (toolbar) {
-            const actionButtons = toolbar.querySelector<HTMLElement>(GEMINI_SELECTORS.deepDiveReport.toolbar.actionButtons);
+            const logPrefix = usedPrimarySelectors ? "(Primary)" : "(Fallback)";
+            console.log(`Gemini Export Enhancer: ${logPrefix} Deep Research toolbar found:`, toolbar);
+            const actionButtons = toolbar.querySelector<HTMLElement>(actionButtonsContainerSelector.substring(actionButtonsContainerSelector.lastIndexOf(' ') + 1)); // Get just the .action-buttons part
+            
             if (actionButtons) {
+              console.log(`Gemini Export Enhancer: ${logPrefix} Deep Research .action-buttons found:`, actionButtons, "using selector suffix:", actionButtonsContainerSelector.substring(actionButtonsContainerSelector.lastIndexOf(' ') + 1));
               injectDeepResearchMenu(actionButtons);
             } else {
-              console.warn("Gemini Export Enhancer: Deep Research .action-buttons not found within toolbar:", toolbar);
+              console.warn(`Gemini Export Enhancer: ${logPrefix} Deep Research .action-buttons (using suffix '${actionButtonsContainerSelector.substring(actionButtonsContainerSelector.lastIndexOf(' ') + 1)}') not found within toolbar:`, toolbar);
             }
           } else {
-            console.warn("Gemini Export Enhancer: Deep Research toolbar container (", GEMINI_SELECTORS.deepDiveReport.container, ") not found.");
+            console.warn("Gemini Export Enhancer: Deep Research toolbar container not found using primary or fallback selectors.");
           }
         }, 500);
       }

@@ -236,6 +236,12 @@ const INTERFERING_ELEMENT_SELECTORS = [
   'sources-carousel',         // Source carousel components
   '.response-footer',         // Footer containing source list (distinct from our generated footer)
   '[hide-from-message-actions]', // General attribute used by Gemini for hidden interactive elements
+  '.avatar-gutter',            // Remove the entire avatar area in normal chat
+  '.response-container-header', // NEW: Remove the entire header of a response container (contains avatar, etc.)
+  'model-thoughts .thoughts-header', // Remove the "Show thinking" button and its header
+  'sensitive-memories-banner', // Remove sensitive content banners
+  'tts-control',              // Remove text-to-speech controls
+  'message-actions',          // Remove the entire message actions bar (thumbs up/down, share, etc.)
   // Add other selectors if needed
 ];
 
@@ -312,9 +318,22 @@ export async function generateImageBlob(
   }
   // --- END NEW ---
 
-  // 1.b Clean the clone (AFTER transferring styles if needed)
+  // REMOVED manual display:none for avatar parts and thoughts-header as they should be handled by INTERFERING_ELEMENT_SELECTORS
+  // const avatarSpinner = cleanedClone.querySelector<HTMLElement>('bard-avatar .avatar_spinner_animation');
+  // if (avatarSpinner) { avatarSpinner.style.display = 'none'; }
+  // const primaryAvatarAnimation = cleanedClone.querySelector<HTMLElement>('bard-avatar .avatar_primary_animation');
+  // if (primaryAvatarAnimation) { primaryAvatarAnimation.style.display = 'none'; }
+  // const bardAvatarElement = cleanedClone.querySelector<HTMLElement>('bard-avatar');
+  // if (bardAvatarElement) { bardAvatarElement.style.display = 'none'; }
+  // const thoughtsHeader = cleanedClone.querySelector<HTMLElement>('model-thoughts .thoughts-header');
+  // if (thoughtsHeader) { thoughtsHeader.style.display = 'none'; }
+
+  // 1.b Clean the clone by REMOVING interfering elements
   INTERFERING_ELEMENT_SELECTORS.forEach(selector => {
-    cleanedClone.querySelectorAll(selector).forEach(el => el.remove());
+    cleanedClone.querySelectorAll(selector).forEach(el => {
+      console.log('Removing interfering element for screenshot:', selector, el);
+      el.remove();
+    });
   });
   // Also remove scripts and iframes just in case
   cleanedClone.querySelectorAll('script, iframe').forEach(el => el.remove());
@@ -348,6 +367,43 @@ export async function generateImageBlob(
   // on the *cleaned* clone before appending it to the wrapper.
   // forceStyles will skip elements inside data-canvas-styled-codeblock="true"
   forceStyles(cleanedClone, mergedOptions.cardBackgroundColor, true);
+
+  // --- BEGIN MODIFICATION: Add margin to H1 in deep research content for better spacing ---
+  const isDeepResearchMessageContentRoot = cleanedClone.tagName === 'MESSAGE-CONTENT' && cleanedClone.id === 'extended-response-message-content';
+  const isDeepResearchImmersiveEditorRoot = cleanedClone.tagName === 'IMMERSIVE-EDITOR' && cleanedClone.getAttribute('data-test-id') === 'immersive-editor';
+
+  if (isDeepResearchMessageContentRoot || isDeepResearchImmersiveEditorRoot) {
+    let h1Selector = '';
+    if (isDeepResearchMessageContentRoot) {
+      h1Selector = '.markdown h1:first-of-type'; 
+    } else if (isDeepResearchImmersiveEditorRoot) {
+      h1Selector = '.ProseMirror h1:first-of-type'; 
+    }
+
+    if (h1Selector) {
+      const firstH1 = cleanedClone.querySelector<HTMLElement>(h1Selector);
+      if (firstH1) {
+        console.log("Found H1 in deep research content:", firstH1, "with selector:", h1Selector);
+        // --- BEGIN MODIFICATION: Adjust H1 line-height if it's multiline ---
+        // Check if the H1 is likely multiline by comparing its scrollHeight to its clientHeight or a typical single line height
+        // Or, more simply, just apply a more generous line-height if it's a deep research H1.
+        const originalLineHeight = window.getComputedStyle(firstH1).lineHeight;
+        firstH1.style.setProperty('line-height', '1.5', 'important'); 
+        console.log(`Applied line-height: 1.5 !important to H1 in deep research (mode: ${isDeepResearchMessageContentRoot ? 'message' : 'editor'}). Original line-height: ${originalLineHeight}`);
+        // --- END MODIFICATION ---
+
+        if (firstH1.nextElementSibling && firstH1.nextElementSibling.tagName === 'P') {
+          firstH1.style.marginBottom = '24px'; // Keep existing margin adjustment
+          console.log(`Applied 24px margin-bottom to H1 in deep research (mode: ${isDeepResearchMessageContentRoot ? 'message' : 'editor'}, next sibling is P).`);
+        } else {
+          console.log("H1 in deep research found, but next sibling is not a P or doesn't exist. Current H1 margin-bottom:", window.getComputedStyle(firstH1).marginBottom);
+        }
+      } else {
+        console.log("Deep research H1 not found using selector:", h1Selector, "within cleanedClone:", cleanedClone);
+      }
+    }
+  }
+  // --- END MODIFICATION ---
 
   // 2. Create the styled wrapper structure
   const captureWrapper = document.createElement('div');
@@ -384,7 +440,8 @@ export async function generateImageBlob(
   card.style.borderRadius = typeof mergedOptions.cardBorderRadius === 'number' ? `${mergedOptions.cardBorderRadius}px` : mergedOptions.cardBorderRadius;
   card.style.boxShadow = mergedOptions.cardBoxShadow;
   card.style.width = '100%';
-  card.style.maxWidth = mergedOptions.cardMaxWidth;
+  const cardMaxWidth = mergedOptions.cardMaxWidth;
+  card.style.maxWidth = cardMaxWidth;
   card.style.boxSizing = 'border-box';
   card.style.overflow = 'hidden'; // Prevent content spillover affecting layout
   card.style.flexGrow = '1';
