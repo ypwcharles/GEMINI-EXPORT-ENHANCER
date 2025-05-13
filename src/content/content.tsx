@@ -1,11 +1,38 @@
-// import React from 'react'; // No longer directly rendering ExportMenu here
-// import ReactDOM from 'react-dom/client'; // No longer directly rendering ExportMenu here
-// import ExportMenu from './components/ExportMenu'; // Component might be used later, or its parts
+import React from 'react'; // Import React
+import ReactDOM from 'react-dom/client'; // Import ReactDOM
+// import Toast from '../ui_components/Toast'; // No longer needed
+import { Toaster } from '@/components/ui/sonner'; // Import shadcn/ui Toaster (Sonner wrapper)
+import { toast } from 'sonner'; // Import toast function from Sonner
 import { GEMINI_SELECTORS } from './selectors';
 import { htmlToMarkdown } from '../core/markdownConverter';
 import { generateImageBlob } from '../core/imageGenerator';
 
 console.log("Gemini Export Enhancer: Script start. Mode: Inject into Share Menu.");
+
+// Create a container for the Toaster and render it once.
+let toasterContainer: HTMLElement | null = null;
+if (!document.getElementById('gemini-enhancer-toaster-container')) {
+  toasterContainer = document.createElement('div');
+  toasterContainer.id = 'gemini-enhancer-toaster-container';
+  // Minimal styling for the container, Toaster itself will handle its positioning and appearance.
+  // It needs to be in the DOM for the Toaster to portal into.
+  toasterContainer.style.zIndex = '2147483647'; // Ensure it's on top
+  document.body.appendChild(toasterContainer);
+  const toasterRoot = ReactDOM.createRoot(toasterContainer);
+  toasterRoot.render(
+    <React.StrictMode>
+      <Toaster richColors position="bottom-right" />
+    </React.StrictMode>
+  );
+  console.log('Sonner Toaster rendered into #gemini-enhancer-toaster-container');
+}
+
+// Global variables for Toast rendering are no longer needed
+// let toastRoot: ReactDOM.Root | null = null;
+// let toastContainer: HTMLDivElement | null = null;
+
+// Old showToast function is replaced by direct calls to sonner's toast()
+// const showToast = (message: string, type: 'success' | 'error' | 'info') => { ... };
 
 // Helper function to trigger download
 function triggerDownload(blob: Blob, filename: string) {
@@ -64,47 +91,50 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
         console.log('DEBUG: 最终内容元素:', contentElement);
         
         if (contentElement) {
-          console.log('  Content HTML found for Copy MD. Length:', contentElement.innerHTML.length);
+          let markdown = ''; // Define markdown outside the try block
           try {
-            const markdown = htmlToMarkdown(contentElement.innerHTML);
-            console.log('  Markdown generated. Length:', markdown.length);
-            console.log('  前50个字符预览:', markdown.substring(0, 50), '...');
-            
-            // 尝试使用异步剪贴板API
-            try {
-              await navigator.clipboard.writeText(markdown);
-              console.log('Success: Markdown copied to clipboard (async API)!');
-            } catch (clipboardError) {
-              console.error('  异步剪贴板API失败，尝试备选方法:', clipboardError);
-              
-              // 备选：使用文档execCommand (已废弃但兼容性更好)
+            markdown = htmlToMarkdown(contentElement.innerHTML); // Assign inside try
+            await navigator.clipboard.writeText(markdown);
+            console.log('Success: Markdown copied to clipboard!');
+            toast.success('Markdown 已复制到剪贴板');
+          } catch (clipboardError: any) {
+            // Fallback using execCommand (less reliable)
+            if (markdown) { // Check if markdown was successfully generated before fallback
+              console.warn('Async clipboard write failed, trying execCommand fallback:', clipboardError);
               const textArea = document.createElement('textarea');
-              textArea.value = markdown;
+              textArea.value = markdown; // Now markdown is accessible
+              textArea.style.position = 'fixed'; // Prevent scrolling to bottom
+              textArea.style.top = '-9999px';
+              textArea.style.left = '-9999px';
               document.body.appendChild(textArea);
               textArea.select();
-              
-              const success = document.execCommand('copy');
-              document.body.removeChild(textArea);
-              
-              if (success) {
-                console.log('Success: Markdown copied to clipboard (execCommand)!');
-              } else {
-                console.error('  复制到剪贴板失败 (execCommand)');
-                alert('无法复制到剪贴板。请检查浏览器权限或手动复制。');
+              let success = false;
+              try {
+                success = document.execCommand('copy');
+              } catch (execError) {
+                console.error('execCommand failed:', execError);
+                success = false;
               }
+              document.body.removeChild(textArea);
+
+              if (success) {
+                console.log('Success: Markdown copied via execCommand!');
+                toast.success('Markdown 已复制到剪贴板');
+              } else {
+                console.error('execCommand copy failed.');
+                // Don't reference clipboardError here, just show generic error
+                toast.error('无法复制 Markdown', { description: '请检查浏览器权限或手动复制。' });
+              }
+            } else {
+              // Handle the case where htmlToMarkdown itself failed
+              console.error('Failed to generate markdown before clipboard fallback attempt.');
+              toast.error('无法处理内容以复制 Markdown');
             }
-            
-            // TODO: Show success Toast notification
-          } catch (error) {
-            console.error('Error converting HTML to Markdown or copying to clipboard:', error);
-            alert('转换或复制过程中出错：' + (error instanceof Error ? error.message : String(error)));
-            // TODO: Show error Toast notification
           }
         } else {
           console.error('  Could not find content element for Copy MD using any selector');
           console.log('  Inspect blockRoot内部的HTML结构:', blockRoot.innerHTML.substring(0, 300), '...');
-          alert('找不到内容元素，无法复制Markdown。请检查控制台获取详情。');
-          // TODO: Show error Toast notification (content not found)
+          toast.error('无法找到内容元素', { description: '无法复制Markdown，请检查控制台。' });
         }
       }
     },
@@ -205,18 +235,15 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
             }, 5000); // 延长回收时间
             
             console.log('Success: Markdown file download initiated!');
-            
-            // TODO: Show success Toast notification
-          } catch (error) {
-            console.error('Error converting HTML to Markdown or downloading:', error);
-            alert('转换或下载过程中出错：' + (error instanceof Error ? error.message : String(error)));
-            // TODO: Show error Toast notification
+            toast.info('Markdown 文件下载已开始');
+          } catch (error: any) {
+            console.error('Error during Markdown download:', error);
+            toast.error('下载 Markdown 时出错', { description: error?.message });
           }
         } else {
           console.error('  Could not find content element for Download MD using any selector');
           console.log('  Inspect blockRoot内部的HTML结构:', blockRoot.innerHTML.substring(0, 300), '...');
-          alert('找不到内容元素，无法下载Markdown。请检查控制台获取详情。');
-          // TODO: Show error Toast notification (content not found)
+          toast.error('无法找到内容元素', { description: '无法下载Markdown，请检查控制台。' });
         }
       }
     },
@@ -249,32 +276,23 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
             if (blob) {
               console.log('  Image blob generated successfully. Size:', blob.size);
               // Copy blob to clipboard
-              try {
-                await navigator.clipboard.write([
-                  new ClipboardItem({ 'image/png': blob })
-                ]);
-                console.log('Success: Image copied to clipboard!');
-                // TODO: Show success Toast notification
-              } catch (clipboardError) {
-                console.error('Error writing image to clipboard:', clipboardError);
-                alert('无法将图片复制到剪贴板：' + (clipboardError instanceof Error ? clipboardError.message : String(clipboardError)));
-                // TODO: Show error Toast notification (clipboard write failed)
-              }
+              await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+              ]);
+              console.log('Success: Image copied to clipboard!');
+              toast.success('图片已复制到剪贴板');
             } else {
               console.error('  Image blob generation failed (returned null).');
-              alert('图片生成失败。');
-              // TODO: Show error Toast notification (image generation failed)
+              toast.error('图片生成失败', { description: '无法复制图片，请检查控制台。' });
             }
-          } catch (error) {
-            console.error('Error during image generation or processing:', error);
-            alert('图片处理过程中出错：' + (error instanceof Error ? error.message : String(error)));
-            // TODO: Show error Toast notification (general image error)
+          } catch (error: any) {
+            console.error('Error during Image copy:', error);
+            toast.error('复制图片时出错', { description: error?.message });
           }
         } else {
           console.error('  Could not find content element for Copy Image using any selector');
           console.log('  Inspect blockRoot HTML:', blockRoot.innerHTML.substring(0, 300), '...');
-          alert('找不到内容元素，无法复制图片。请检查控制台获取详情。');
-          // TODO: Show error Toast notification (content not found)
+          toast.error('无法找到内容元素', { description: '无法复制图片，请检查控制台。' });
         }
       }
     },
@@ -314,23 +332,19 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
               
               triggerDownload(blob, filename);
               console.log('Success: Image download initiated!');
-              // TODO: Show success/download started Toast notification
-              
+              toast.info('图片文件下载已开始');
             } else {
               console.error('  Image blob generation failed (returned null).');
-              alert('图片生成失败。');
-              // TODO: Show error Toast notification (image generation failed)
+              toast.error('图片生成失败', { description: '无法下载图片，请检查控制台。' });
             }
-          } catch (error) {
-            console.error('Error during image generation or download triggering:', error);
-            alert('图片处理或下载过程中出错：' + (error instanceof Error ? error.message : String(error)));
-            // TODO: Show error Toast notification (general image error)
+          } catch (error: any) {
+            console.error('Error during Image download:', error);
+            toast.error('下载图片时出错', { description: error?.message });
           }
         } else {
           console.error('  Could not find content element for Download Image using any selector');
           console.log('  Inspect blockRoot HTML:', blockRoot.innerHTML.substring(0, 300), '...');
-          alert('找不到内容元素，无法下载图片。请检查控制台获取详情。');
-          // TODO: Show error Toast notification (content not found)
+          toast.error('无法找到内容元素', { description: '无法下载图片，请检查控制台。' });
         }
       }
     },
@@ -352,33 +366,43 @@ function addCustomMenuItems(shareMenuPanel: HTMLElement, answerBlockRoot: HTMLEl
     button.onmouseenter = () => button.style.backgroundColor = '#f0f0f0'; // Basic hover
     button.onmouseleave = () => button.style.backgroundColor = 'transparent';
 
-    button.onclick = (e) => {
-      console.log(`Gemini Export Enhancer: Custom button '${item.label}' CLICKED.`); // Log click immediately
+    button.onclick = async (e) => {
+      console.log(`Gemini Export Enhancer: Custom button '${item.label}' CLICKED.`);
       e.stopPropagation(); 
-      e.preventDefault(); // Try preventing default menu behavior as well
-      
-      // 尝试关闭菜单面板（如果有的话）
-      const menuPanel = document.querySelector(GEMINI_SELECTORS.shareMenu.menuPanel) as HTMLElement;
-      if (menuPanel) {
-        // 添加一个很短的延迟以确保我们的操作先执行
-        setTimeout(() => {
-          try {
-            // 尝试通过点击文档来关闭菜单
-            document.body.click();
-            console.log("尝试关闭菜单面板");
-          } catch (error) {
-            console.error("关闭菜单面板失败:", error);
-          }
-        }, 10);
-      }
+      e.preventDefault();
       
       try {
         console.log("Gemini Export Enhancer: Attempting to call action function...");
-        item.action(answerBlockRoot);
+        await item.action(answerBlockRoot);
         console.log("Gemini Export Enhancer: Action function called successfully.");
       } catch (error) {
         console.error("Gemini Export Enhancer: Error executing action function:", error);
+        // Error toast is likely handled within item.action, but consider a generic one if not.
       }
+      
+      // Attempt to close the menu AFTER the action has completed
+      // Use a small delay to ensure other UI updates (like toast) can render before menu vanishes
+      setTimeout(() => {
+        const menuPanel = document.querySelector(GEMINI_SELECTORS.shareMenu.menuPanel) as HTMLElement;
+        if (menuPanel && menuPanel.offsetParent !== null) { // Check if menu is still visible/in DOM
+          try {
+            // Attempt 1: Click the CDK overlay backdrop (common for Angular Material menus)
+            const cdkBackdrop = document.querySelector('.cdk-overlay-backdrop');
+            if (cdkBackdrop && cdkBackdrop instanceof HTMLElement) {
+              cdkBackdrop.click();
+              console.log("Gemini Export Enhancer: Attempted to close menu by clicking .cdk-overlay-backdrop");
+              return; // Assume this worked
+            }
+
+            // Attempt 2: Fallback to clicking document.body (less reliable but worth a try)
+            document.body.click();
+            console.log("Gemini Export Enhancer: Attempted to close menu by clicking document.body (fallback)");
+
+          } catch (error) {
+            console.error("Gemini Export Enhancer: Error attempting to close menu panel:", error);
+          }
+        }
+      }, 100); // 100ms delay, can be adjusted
     };
 
     if (divider && divider.parentNode) {

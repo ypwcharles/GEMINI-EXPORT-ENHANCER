@@ -349,52 +349,36 @@ alwaysApply: true
 
 **阶段 3: 核心功能 - 图片导出**
 
-*   [ ] **步骤 3.1: 核心图片生成模块 (`src/core/imageGenerator.ts`)**
+*   [x] **步骤 3.1: 核心图片生成模块 (`src/core/imageGenerator.ts`)**
     *   任务:
-        *   [ ] 创建或完善 `src/core/imageGenerator.ts`。
-        *   [ ] 实现一个函数，例如 `export async function generateImageBlob(element: HTMLElement): Promise<Blob | null>`。
-        *   [ ] 内部使用 `html2canvas` 库将传入的 DOM 元素 `element` 渲染到 Canvas 上。
-        *   [ ] (重要) 在调用 `html2canvas` 前，可能需要对 `element` 或其克隆进行一些样式调整（如设置固定宽度、移除不必要的滚动条、确保背景色可见等）以获得更好的截图效果。
-        *   [ ] 将 Canvas 内容转换为 `Blob` 对象 (例如 `canvas.toBlob(resolve, 'image/png')`)。
-        *   [ ] 添加错误处理逻辑。
+        *   [x] 创建或完善 `src/core/imageGenerator.ts`。
+        *   [x] 实现一个函数，例如 `export async function generateImageBlob(element: HTMLElement): Promise<Blob | null>`。
+        *   [x] 内部使用 `html2canvas` 库将传入的 DOM 元素 `element` 渲染到 Canvas 上。
+        *   [x] (重要) 在调用 `html2canvas` 前，可能需要对 `element` 或其克隆进行一些样式调整（如设置固定宽度、移除不必要的滚动条、确保背景色可见等）以获得更好的截图效果。
+        *   [x] 将 Canvas 内容转换为 `Blob` 对象 (例如 `canvas.toBlob(resolve, 'image/png')`)。
+        *   [x] 添加错误处理逻辑。
     *   验证: 能够传入一个 DOM 元素，并成功生成对应的 PNG 图片 Blob 数据。
 
-*   [ ] **步骤 3.2: "复制为图片"功能实现**
+*   [x] **步骤 3.2: "复制为图片"功能实现**
     *   任务:
-        *   [ ] 在 `content.ts` 的 `onExportAction` 处理函数中，当 `actionType` 为 "copyImage" 时：
-            1.  [ ] 获取关联内容块的 DOM 元素。
-            2.  [ ] 调用 `generateImageBlob` 函数获取图片 Blob。
-            3.  [ ] 如果成功获取 Blob，使用 `navigator.clipboard.write()` API 将图片写入剪贴板。
-                ```javascript
-                try {
-                  const blob = await generateImageBlob(element);
-                  if (blob) {
-                    await navigator.clipboard.write([
-                      new ClipboardItem({ 'image/png': blob })
-                    ]);
-                    // 显示成功 Toast
-                  } else {
-                    // 显示失败 Toast
-                  }
-                } catch (err) {
-                  console.error('Failed to copy image: ', err);
-                  // 显示失败 Toast
-                }
-                ```
-            4.  [ ] 确保 `manifest.json` 中已声明 `clipboardWrite` 权限。
+        *   [x] 在 `content.ts` 的 `onExportAction` 处理函数中，当 `actionType` 为 "copyImage" 时：
+            1.  [x] 获取关联内容块的 DOM 元素。
+            2.  [x] 调用 `generateImageBlob` 函数获取图片 Blob。
+            3.  [x] 如果成功获取 Blob，使用 `navigator.clipboard.write()` API 将图片写入剪贴板。
+            4.  [x] 确保 `manifest.json` 中已声明 `clipboardWrite` 权限。
             5.  [ ] 显示操作结果 Toast 通知。
     *   验证: 在 Gemini 页面使用此功能，能够将回答区域的截图复制到系统剪贴板，并可粘贴到其他应用中。
 
-*   [ ] **步骤 3.3: "下载为图片"功能实现**
+*   [x] **步骤 3.3: "下载为图片"功能实现**
     *   任务:
-        *   [ ] 在 `content.ts` 的 `onExportAction` 处理函数中，当 `actionType` 为 "downloadImage" 时：
-            1.  [ ] 获取关联内容块的 DOM 元素。
-            2.  [ ] 调用 `generateImageBlob` 函数获取图片 Blob。
-            3.  [ ] 如果成功获取 Blob，创建一个 `<a>` 元素。
-            4.  [ ] 设置 `href` 为 `URL.createObjectURL(blob)`。
-            5.  [ ] 设置 `download` 属性 (例如 `gemini_export.png`)。
-            6.  [ ] 模拟点击 `<a>` 元素触发下载。
-            7.  [ ] 下载后使用 `URL.revokeObjectURL(href)` 释放资源。
+        *   [x] 在 `content.ts` 的 `onExportAction` 处理函数中，当 `actionType` 为 "downloadImage" 时：
+            1.  [x] 获取关联内容块的 DOM 元素。
+            2.  [x] 调用 `generateImageBlob` 函数获取图片 Blob。
+            3.  [x] 如果成功获取 Blob，创建一个 `<a>` 元素。
+            4.  [x] 设置 `href` 为 `URL.createObjectURL(blob)`。
+            5.  [x] 设置 `download` 属性 (例如 `gemini_export.png`)。
+            6.  [x] 模拟点击 `<a>` 元素触发下载。
+            7.  [x] 下载后使用 `URL.revokeObjectURL(href)` 释放资源。
             8.  [ ] 显示下载开始或完成的 Toast 通知。
     *   验证: 在 Gemini 页面使用此功能，能够成功下载包含回答区域截图的 PNG 文件。
 
