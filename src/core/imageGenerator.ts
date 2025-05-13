@@ -47,7 +47,7 @@ const DEFAULT_STYLES: Required<Omit<ImageStyleOptions, 'pageTitle' /* removed fo
   cardBackgroundColor: '#FFFFFF',
   cardPadding: '25px',
   cardBorderRadius: '12px',
-  cardBoxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+  cardBoxShadow: '0 10px 25px rgb(255, 255, 255)',
   cardMaxWidth: '100%',
 
   // Default footer values
@@ -64,24 +64,20 @@ const DEFAULT_STYLES: Required<Omit<ImageStyleOptions, 'pageTitle' /* removed fo
   backgroundColor: null, 
 };
 
-// Helper function to recursively set text color and transparent background
-function forceStyles(element: HTMLElement) {
+// Helper function to recursively set text color and apply a specific background color
+function forceStyles(element: HTMLElement, targetBackgroundColor: string) {
   element.style.color = '#000000'; // Force black text
-  // Set background to transparent unless it's the card itself or a specific element we want to keep
-  if (!element.classList.contains('capture-card-background')) { 
-    element.style.backgroundColor = 'transparent';
-  }
 
-  // Handle specific elements like <code> blocks for better visibility if needed
-  if (element.tagName === 'CODE' || element.tagName === 'PRE') {
-    element.style.backgroundColor = '#f0f0f0'; // Light gray for code blocks
-    element.style.padding = '2px 4px';
-    element.style.borderRadius = '4px';
+  // Apply the target background unless it's the card wrapper itself (which has its own background)
+  if (!element.classList.contains('capture-card-background')) {
+    // Apply the target background (white) to all elements inside the card
+    element.style.backgroundColor = targetBackgroundColor;
   }
 
   const children = element.children;
   for (let i = 0; i < children.length; i++) {
-    forceStyles(children[i] as HTMLElement);
+    // Recursively call with the same target background color
+    forceStyles(children[i] as HTMLElement, targetBackgroundColor);
   }
 }
 
@@ -99,10 +95,11 @@ export async function generateImageBlob(
 ): Promise<Blob | null> {
   const mergedOptions = { ...DEFAULT_STYLES, ...options };
 
+  // 1. Prepare the captureWrapper HTML content (similar to before)
   const captureWrapper = document.createElement('div');
   captureWrapper.style.position = 'fixed';
-  captureWrapper.style.top = '-9999px'; 
-  captureWrapper.style.left = '-9999px';
+  captureWrapper.style.top = '0'; // Can be 0 as it's inside an offscreen iframe
+  captureWrapper.style.left = '0'; // Can be 0
   captureWrapper.style.width = `${mergedOptions.pageWidth}px`;
   captureWrapper.style.padding = typeof mergedOptions.pagePadding === 'number' ? `${mergedOptions.pagePadding}px` : mergedOptions.pagePadding;
   captureWrapper.style.background = mergedOptions.pageGradient;
@@ -110,7 +107,7 @@ export async function generateImageBlob(
   captureWrapper.style.flexDirection = 'column';
   captureWrapper.style.alignItems = 'center'; 
   captureWrapper.style.boxSizing = 'border-box';
-  captureWrapper.style.minHeight = 'auto'; // Let content determine height initially
+  captureWrapper.style.minHeight = 'auto'; 
 
   if (mergedOptions.pageTitle) {
     const titleElement = document.createElement('h1');
@@ -121,12 +118,12 @@ export async function generateImageBlob(
     titleElement.style.textAlign = 'center';
     titleElement.style.marginBottom = mergedOptions.pageTitleMarginBottom;
     titleElement.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-    titleElement.style.flexShrink = '0'; // Prevent title from shrinking
+    titleElement.style.flexShrink = '0';
     captureWrapper.appendChild(titleElement);
   }
 
   const card = document.createElement('div');
-  card.classList.add('capture-card-background'); // Add class for forceStyles exclusion
+  card.classList.add('capture-card-background');
   card.style.backgroundColor = mergedOptions.cardBackgroundColor;
   card.style.padding = typeof mergedOptions.cardPadding === 'number' ? `${mergedOptions.cardPadding}px` : mergedOptions.cardPadding;
   card.style.borderRadius = typeof mergedOptions.cardBorderRadius === 'number' ? `${mergedOptions.cardBorderRadius}px` : mergedOptions.cardBorderRadius;
@@ -135,12 +132,27 @@ export async function generateImageBlob(
   card.style.maxWidth = mergedOptions.cardMaxWidth;
   card.style.boxSizing = 'border-box';
   card.style.overflow = 'hidden'; 
-  card.style.flexGrow = '1'; // Allow card to grow and fill available space
-  card.style.display = 'flex'; // To help manage content flow if needed
-  card.style.flexDirection = 'column'; // Content flows top to bottom
+  card.style.flexGrow = '1';
+  card.style.display = 'flex';
+  card.style.flexDirection = 'column';
   
   const clone = elementToClone.cloneNode(true) as HTMLElement;
-  forceStyles(clone); // Apply black text and transparent background recursively
+
+  const scripts = clone.querySelectorAll('script');
+  scripts.forEach(script => script.remove());
+  const iframes = clone.querySelectorAll('iframe');
+  iframes.forEach(iframe => iframe.remove());
+  const allElements = clone.querySelectorAll('*');
+  allElements.forEach(el => {
+    for (const attr of Array.from(el.attributes)) {
+      if (attr.name.startsWith('on')) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  });
+
+  forceStyles(clone, card.style.backgroundColor);
+
   card.appendChild(clone);
   captureWrapper.appendChild(card);
 
@@ -153,45 +165,90 @@ export async function generateImageBlob(
     footerElement.style.textAlign = 'center';
     footerElement.style.marginTop = mergedOptions.footerMarginTop;
     footerElement.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-    footerElement.style.flexShrink = '0'; // Prevent footer from shrinking
+    footerElement.style.flexShrink = '0';
     captureWrapper.appendChild(footerElement);
   }
 
-  document.body.appendChild(captureWrapper);
-  // Force a reflow to ensure dimensions are calculated before capture
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _ = captureWrapper.offsetHeight; 
+  // 2. Create an iframe
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.top = '-9999px'; // Position off-screen
+  iframe.style.left = '-9999px';
+  iframe.style.width = `${mergedOptions.pageWidth + 20}px`; // Add some buffer for scrollbars if any
+  iframe.style.height = '100px'; // Initial small height, will be adjusted
+  iframe.style.border = 'none';
+  iframe.sandbox.add('allow-same-origin'); // IMPORTANT: Allow same origin to access content, but NO allow-scripts
 
-  try {
-    // Prepare html2canvas options separately
-    const canvasOptions = {
-      useCORS: mergedOptions.useCORS !== undefined ? mergedOptions.useCORS : true,
-      logging: mergedOptions.logging !== undefined ? mergedOptions.logging : false,
-      backgroundColor: mergedOptions.backgroundColor !== undefined ? mergedOptions.backgroundColor : null,
-      scale: mergedOptions.scale || (window.devicePixelRatio > 1 ? window.devicePixelRatio : 1),
-      // Ensure the entire captureWrapper is captured even if content is small
-      height: captureWrapper.scrollHeight,
-      width: captureWrapper.scrollWidth,
-      windowHeight: captureWrapper.scrollHeight,
-      windowWidth: captureWrapper.scrollWidth,
-      // --- Add any other specific html2canvas options from mergedOptions here if needed ---
+  document.body.appendChild(iframe);
+
+  return new Promise((resolvePromise, rejectPromise) => {
+    iframe.onload = async () => {
+      try {
+        if (!iframe.contentWindow || !iframe.contentWindow.document) {
+          console.error('iframe contentWindow or document not available');
+          rejectPromise(new Error('iframe content not available'));
+          return;
+        }
+        
+        const iframeDoc = iframe.contentWindow.document;
+        iframeDoc.body.innerHTML = captureWrapper.outerHTML; // Inject the styled wrapper
+
+        // Find the injected wrapper within the iframe
+        const elementToCaptureInIframe = iframeDoc.body.firstChild as HTMLElement;
+
+        if (!elementToCaptureInIframe) {
+            console.error('Could not find the capture element inside iframe');
+            rejectPromise(new Error('Could not find element in iframe'));
+            return;
+        }
+        
+        // Adjust iframe height to content
+        iframe.style.height = `${elementToCaptureInIframe.scrollHeight}px`;
+        iframe.style.width = `${elementToCaptureInIframe.scrollWidth}px`; // Ensure width matches content too
+
+        const canvasOptions = {
+          useCORS: mergedOptions.useCORS !== undefined ? mergedOptions.useCORS : true,
+          logging: mergedOptions.logging !== undefined ? mergedOptions.logging : false,
+          backgroundColor: mergedOptions.backgroundColor !== undefined ? mergedOptions.backgroundColor : null, 
+          scale: mergedOptions.scale || (window.devicePixelRatio > 1 ? window.devicePixelRatio : 1),
+          // Capture the specific element from iframe
+          height: elementToCaptureInIframe.scrollHeight,
+          width: elementToCaptureInIframe.scrollWidth,
+          windowHeight: elementToCaptureInIframe.scrollHeight, // Use element's scrollHeight for windowHeight
+          windowWidth: elementToCaptureInIframe.scrollWidth,  // Use element's scrollWidth for windowWidth
+        };
+        
+        console.log('Capturing iframe content with html2canvas...', canvasOptions);
+        const canvas = await html2canvas(elementToCaptureInIframe, canvasOptions as any);
+
+        canvas.toBlob((blob) => {
+          resolvePromise(blob);
+        }, 'image/png');
+
+      } catch (error) {
+        console.error('Error during html2canvas processing with iframe:', error);
+        rejectPromise(error);
+      } finally {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }
     };
 
-    console.log('Capturing styled wrapper with html2canvas...', canvasOptions);
-    // Pass the prepared options directly
-    const canvas = await html2canvas(captureWrapper, canvasOptions as any); // Cast to any remains needed for flexibility
-
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        resolve(blob);
-      }, 'image/png');
-    });
-  } catch (error) {
-    console.error('Error generating image with styled wrapper:', error);
-    return null;
-  } finally {
-    if (document.body.contains(captureWrapper)) {
-      document.body.removeChild(captureWrapper);
+    iframe.onerror = (err) => {
+        console.error("Failed to load iframe srcdoc:", err);
+        rejectPromise(new Error("iframe srcdoc loading failed"));
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+    };
+    
+    // Setting srcdoc will trigger onload. Ensure the body exists.
+    if (iframe.contentDocument && iframe.contentDocument.body) {
+        iframe.contentDocument.body.innerHTML = ''; // Clear previous content just in case
     }
-  }
+    iframe.srcdoc = `<!DOCTYPE html><html><head><style>body { margin: 0; }</style></head><body></body></html>`; // Basic HTML structure for srcdoc
+    // The actual content is injected in iframe.onload
+
+  });
 } 
