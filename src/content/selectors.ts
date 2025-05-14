@@ -10,6 +10,11 @@ export const GEMINI_SELECTORS = {
   answerContainer: 'model-response',
 
   /**
+   * 新增：选择器，用于定位每个用户提问 (user query) 的容器元素。
+   */
+  userQuery: 'user-query',
+
+  /**
    * 用于定位回答内容本身，以便提取HTML。
    * 使用多个候选选择器，按优先级排序。
    */
@@ -84,6 +89,18 @@ export const GEMINI_SELECTORS = {
      */
     divider: 'mat-divider'
   },
+
+  /**
+   * 新增：选择器，用于定位聊天历史记录的滚动容器。
+   */
+  chatHistoryContainer: '#chat-history.chat-history-scroll-container',
+  // 或者更具体的 infinite-scroller:
+  // chatHistoryScroller: 'infinite-scroller[data-test-id="chat-history-container"]',
+
+  /**
+   * 新增：选择器，用于定位聊天输入区域的容器。
+   */
+  inputAreaContainer: 'input-container',
 
   /**
    * 深度研究报告相关选择器，根据实际DOM结构组织

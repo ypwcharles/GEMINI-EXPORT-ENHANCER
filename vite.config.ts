@@ -18,9 +18,19 @@ export default defineConfig({
         // popup: resolve(__dirname, 'src/popup/popup.html'), // Example: if using a popup
       },
       output: {
-        entryFileNames: 'js/[name].js',
+        entryFileNames: (chunkInfo) => {
+          if (chunkInfo.name === 'content') {
+            return 'js/content.js';
+          }
+          return 'js/[name]-[hash].js';
+        },
         chunkFileNames: 'js/chunks/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name === 'content.css') {
+            return 'assets/content.css';
+          }
+          return 'assets/[name]-[hash].[ext]';
+        },
       }
     },
     outDir: 'dist'

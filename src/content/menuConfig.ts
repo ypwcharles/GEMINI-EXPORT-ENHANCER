@@ -2,6 +2,7 @@ import {
   ClipboardDocumentIcon,
   ArrowDownTrayIcon,
   PhotoIcon,
+  QueueListIcon,
 } from '@heroicons/react/24/outline';
 import React from 'react'; // Needed for React.ComponentType
 
@@ -30,6 +31,10 @@ export const S_MENU_ITEM_LABELS = {
   downloadMarkdown: {
     zh: '下载为 Markdown',
     en: 'Download as Markdown',
+  },
+  selectMultipleMessages: {
+    zh: '选择多条信息分享',
+    en: 'Select Multiple Messages',
   },
 } as const; // Use 'as const' for stricter typing of keys
 
@@ -63,5 +68,9 @@ export const MENU_ITEMS_CONFIG: Omit<MenuItemConfig, 'action'>[] = [
   {
     id: 'downloadMarkdown',
     icon: ArrowDownTrayIcon,
+  },
+  {
+    id: 'selectMultipleMessages',
+    icon: QueueListIcon,
   },
 ]; 

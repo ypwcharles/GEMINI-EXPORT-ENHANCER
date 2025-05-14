@@ -3,7 +3,6 @@ module.exports = {
   darkMode: ["class"], // shadcn/ui typically uses class-based dark mode
   content: [
     './pages/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
     './app/**/*.{ts,tsx}',
     './src/**/*.{ts,tsx}', // Added src for our project structure
 		"./index.html", 
