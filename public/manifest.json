@@ -11,8 +11,12 @@
     "downloads"
   ],
   "host_permissions": [
-    "*://gemini.google.com/*"
+    "*://gemini.google.com/*",
+    "*://lh3.googleusercontent.com/*"
   ],
+  "background": {
+    "service_worker": "js/background.js"
+  },
   "action": {
     "default_title": "Gemini Export Enhancer",
     "default_icon": {
