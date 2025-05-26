@@ -347,6 +347,50 @@ export async function generateImageBlob(
      }
    });
 
+  // --- START: Modify Google User Content Image URLs to Full Size ---
+  console.log('Searching for Google User Content images to resize...');
+  const imagesInClone = cleanedClone.querySelectorAll('img');
+  imagesInClone.forEach(img => {
+    if (img.src && img.src.startsWith('https://lh3.googleusercontent.com/')) {
+      try {
+        let url = new URL(img.src);
+        let pathSegments = url.pathname.split('/');
+        let lastSegment = pathSegments[pathSegments.length - 1];
+
+        if (lastSegment.includes('=')) {
+          // If last segment already contains an image option, replace it with =d
+          // Ensure not to create something like image.jpg=d if original was image.jpg
+          if (!lastSegment.match(/\.[a-zA-Z]+$/) || lastSegment.includes('=')) { // Check if it's not just an extension or already has options
+            lastSegment = lastSegment.substring(0, lastSegment.indexOf('=')) + '=d';
+          } else if (!lastSegment.endsWith('=d')) { // It's like image.jpg, append =d
+             lastSegment += '=d';
+          }
+        } else if (!lastSegment.endsWith('=d')) {
+          // If no options, just append =d
+          lastSegment += '=d';
+        }
+        
+        // Only proceed if changes were made or it wasn't =d already
+        if (!url.pathname.endsWith('/' + lastSegment) || url.search !== '') {
+            pathSegments[pathSegments.length - 1] = lastSegment;
+            url.pathname = pathSegments.join('/');
+            url.search = ''; // Clear existing search parameters
+
+            const newSrc = url.toString();
+            if (img.src !== newSrc) {
+                console.log('Original image URL:', img.src);
+                img.src = newSrc;
+                console.log('Modified image URL to full size:', img.src);
+            }
+        }
+      } catch (e) {
+        console.error('Error processing image URL for full size:', img.src, e);
+      }
+    }
+  });
+  console.log('Finished searching for Google User Content images.');
+  // --- END: Modify Google User Content Image URLs to Full Size ---
+
   // The new function applyCanvasFriendlyCodeStyles handles line-height for code blocks,
   // so the loop below is no longer needed and might conflict.
   // const codeElements = cleanedClone.querySelectorAll('pre, code');
@@ -558,4 +602,235 @@ export async function generateImageBlob(
     iframe.srcdoc = `<!DOCTYPE html><html><head><style>body { margin: 0; }</style></head><body></body></html>`;
 
   });
-} 
+}
+
+/**
+ * Generates a single image Blob from multiple HTML elements, combining them into one vertical image.
+ *
+ * @param elements An array of HTML elements to capture and combine.
+ * @param options Optional style and html2canvas options.
+ * @returns A Promise that resolves with the image Blob, or null if an error occurs.
+ */
+export async function generateCombinedImageBlob(
+  elements: HTMLElement[],
+  options?: Partial<ImageStyleOptions>
+): Promise<Blob | null> {
+  if (!elements || elements.length === 0) {
+    console.error('No elements provided for combined image generation.');
+    return null;
+  }
+
+  const mergedOptions = { ...DEFAULT_STYLES, ...options };
+
+  // 1. Create the styled wrapper structure (page and main card)
+  const captureWrapper = document.createElement('div');
+  captureWrapper.style.position = 'fixed';
+  captureWrapper.style.top = '0';
+  captureWrapper.style.left = '0';
+  captureWrapper.style.width = `${mergedOptions.pageWidth}px`;
+  captureWrapper.style.padding = typeof mergedOptions.pagePadding === 'number' ? `${mergedOptions.pagePadding}px` : mergedOptions.pagePadding;
+  captureWrapper.style.background = mergedOptions.pageGradient;
+  captureWrapper.style.display = 'flex';
+  captureWrapper.style.flexDirection = 'column';
+  captureWrapper.style.alignItems = 'center';
+  captureWrapper.style.boxSizing = 'border-box';
+  captureWrapper.style.minHeight = 'auto';
+
+  if (mergedOptions.pageTitle) {
+    const titleElement = document.createElement('h1');
+    titleElement.textContent = mergedOptions.pageTitle;
+    titleElement.style.color = mergedOptions.pageTitleColor;
+    titleElement.style.fontSize = mergedOptions.pageTitleFontSize;
+    titleElement.style.fontWeight = mergedOptions.pageTitleFontWeight;
+    titleElement.style.textAlign = 'center';
+    titleElement.style.marginBottom = mergedOptions.pageTitleMarginBottom;
+    titleElement.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    titleElement.style.flexShrink = '0';
+    captureWrapper.appendChild(titleElement);
+  }
+
+  const mainCard = document.createElement('div');
+  mainCard.classList.add('capture-card-background');
+  mainCard.style.backgroundColor = mergedOptions.cardBackgroundColor;
+  mainCard.style.padding = typeof mergedOptions.cardPadding === 'number' ? `${mergedOptions.cardPadding}px` : mergedOptions.cardPadding;
+  mainCard.style.borderRadius = typeof mergedOptions.cardBorderRadius === 'number' ? `${mergedOptions.cardBorderRadius}px` : mergedOptions.cardBorderRadius;
+  mainCard.style.boxShadow = mergedOptions.cardBoxShadow;
+  mainCard.style.width = '100%';
+  mainCard.style.maxWidth = mergedOptions.cardMaxWidth;
+  mainCard.style.boxSizing = 'border-box';
+  mainCard.style.overflow = 'hidden';
+  mainCard.style.flexGrow = '1';
+  mainCard.style.display = 'flex';
+  mainCard.style.flexDirection = 'column';
+
+  // 2. Message Processing Loop
+  for (let i = 0; i < elements.length; i++) {
+    const originalElement = elements[i];
+    const messageClone = originalElement.cloneNode(true) as HTMLElement;
+
+    // 2a. Transfer computed line-height (optional, but good for consistency)
+    try {
+      transferComputedLineHeight(originalElement, messageClone);
+    } catch (e) {
+      console.warn("Error transferring computed line-height for a message clone:", e);
+    }
+
+    // 2b. Clean messageClone: remove interfering elements, scripts, iframes, event handlers
+    INTERFERING_ELEMENT_SELECTORS.forEach(selector => {
+      messageClone.querySelectorAll(selector).forEach(el => el.remove());
+    });
+    messageClone.querySelectorAll('script, iframe').forEach(el => el.remove());
+    const allElementsInMessageClone = messageClone.querySelectorAll('*');
+    allElementsInMessageClone.forEach(el => {
+      for (const attr of Array.from(el.attributes)) {
+        if (attr.name.startsWith('on')) {
+          el.removeAttribute(attr.name);
+        }
+      }
+    });
+
+    // 2c. Apply URL Transformation for Google User Content images
+    const imagesInMessageClone = messageClone.querySelectorAll('img');
+    imagesInMessageClone.forEach(img => {
+      if (img.src && img.src.startsWith('https://lh3.googleusercontent.com/')) {
+        try {
+          let url = new URL(img.src);
+          let pathSegments = url.pathname.split('/');
+          let lastSegment = pathSegments[pathSegments.length - 1];
+          if (lastSegment.includes('=')) {
+            if (!lastSegment.match(/\.[a-zA-Z]+$/) || lastSegment.includes('=')) {
+              lastSegment = lastSegment.substring(0, lastSegment.indexOf('=')) + '=d';
+            } else if (!lastSegment.endsWith('=d')) {
+               lastSegment += '=d';
+            }
+          } else if (!lastSegment.endsWith('=d')) {
+            lastSegment += '=d';
+          }
+          if (!url.pathname.endsWith('/' + lastSegment) || url.search !== '') {
+              pathSegments[pathSegments.length - 1] = lastSegment;
+              url.pathname = pathSegments.join('/');
+              url.search = '';
+              const newSrc = url.toString();
+              if (img.src !== newSrc) {
+                  img.src = newSrc;
+              }
+          }
+        } catch (e) {
+          console.error('Error processing image URL for full size in combined image:', img.src, e);
+        }
+      }
+    });
+
+    // 2d. Style Code Blocks
+    const codeBlocksInMessageClone = messageClone.querySelectorAll<HTMLElement>('div.code-block');
+    codeBlocksInMessageClone.forEach(codeBlockEl => {
+      applyCanvasFriendlyCodeStyles(codeBlockEl);
+    });
+
+    // 2e. Force General Styles (pass 'transparent' and isRoot=false)
+    // This aims to style text, etc., without applying a background to the individual messageClone.
+    forceStyles(messageClone, 'transparent', false);
+    // Ensure the direct messageClone itself does not have a conflicting background from its original state.
+    messageClone.style.backgroundColor = 'transparent'; 
+
+
+    // 2f. Append messageClone to the main card
+    mainCard.appendChild(messageClone);
+
+    // 2g. Add Separator (if not the last message)
+    if (i < elements.length - 1) {
+      const separator = document.createElement('hr');
+      separator.style.cssText = 'border: none; border-top: 1px solid #e0e0e0; margin: 15px 0; width: 100%;';
+      mainCard.appendChild(separator);
+    }
+  }
+
+  captureWrapper.appendChild(mainCard); // Append the main card containing all messages
+
+  if (mergedOptions.footerText) {
+    const footerElement = document.createElement('p');
+    footerElement.textContent = mergedOptions.footerText;
+    footerElement.style.color = mergedOptions.footerColor;
+    footerElement.style.fontSize = mergedOptions.footerFontSize;
+    footerElement.style.fontWeight = mergedOptions.footerFontWeight;
+    footerElement.style.textAlign = 'center';
+    footerElement.style.marginTop = mergedOptions.footerMarginTop;
+    footerElement.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    footerElement.style.flexShrink = '0';
+    captureWrapper.appendChild(footerElement);
+  }
+
+  // 3. Iframe and html2canvas logic (similar to generateImageBlob)
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.top = '-9999px';
+  iframe.style.left = '-9999px';
+  iframe.style.width = `${mergedOptions.pageWidth + 40}px`;
+  iframe.style.height = '100px';
+  iframe.style.border = 'none';
+  iframe.sandbox.add('allow-same-origin');
+  document.body.appendChild(iframe);
+
+  return new Promise((resolvePromise, rejectPromise) => {
+    iframe.onload = async () => {
+      try {
+        if (!iframe.contentWindow || !iframe.contentWindow.document) {
+          console.error('iframe contentWindow or document not available for combined image.');
+          rejectPromise(new Error('iframe content not available'));
+          return;
+        }
+
+        const iframeDoc = iframe.contentWindow.document;
+        iframeDoc.body.style.margin = '0';
+        iframeDoc.body.innerHTML = captureWrapper.outerHTML;
+
+        const elementToCaptureInIframe = iframeDoc.body.firstChild as HTMLElement;
+        if (!elementToCaptureInIframe) {
+          console.error('Could not find the capture element inside iframe for combined image.');
+          rejectPromise(new Error('Could not find element in iframe'));
+          return;
+        }
+
+        const contentHeight = elementToCaptureInIframe.scrollHeight;
+        const contentWidth = elementToCaptureInIframe.scrollWidth;
+        iframe.style.height = `${contentHeight}px`;
+        iframe.style.width = `${contentWidth}px`;
+
+        await new Promise(resolve => setTimeout(resolve, 100)); // Delay
+
+        const canvasOptions = {
+          useCORS: mergedOptions.useCORS,
+          logging: mergedOptions.logging,
+          backgroundColor: null,
+          scale: mergedOptions.scale || (window.devicePixelRatio > 1 ? window.devicePixelRatio : 1),
+        };
+
+        const canvas = await html2canvas(elementToCaptureInIframe, canvasOptions as any);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolvePromise(blob);
+          } else {
+            rejectPromise(new Error('Canvas to Blob conversion failed for combined image'));
+          }
+        }, 'image/png');
+
+      } catch (error) {
+        console.error('Error during html2canvas processing for combined image:', error);
+        rejectPromise(error);
+      } finally {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }
+    };
+
+    iframe.onerror = (err) => {
+      console.error("Failed to load iframe srcdoc for combined image:", err);
+      rejectPromise(new Error("iframe srcdoc loading failed"));
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
+    };
+    iframe.srcdoc = `<!DOCTYPE html><html><head><style>body { margin: 0; }</style></head><body></body></html>`;
+  });
+}

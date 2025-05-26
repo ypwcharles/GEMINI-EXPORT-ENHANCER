@@ -25,8 +25,9 @@ import {
 import {
   handleCopyMarkdown,
   handleDownloadMarkdown,
-  handleCopyImage,
+  handleCopyImage, // Keep for single image copy logic if any remains (e.g. from menu items)
   handleDownloadImage,
+  handleCopyMultipleImagesAsSingle, // Import the new action
   // triggerDownload // Not directly needed if actions handle it
 } from './actions';
 
@@ -419,33 +420,26 @@ function renderOrUpdateSelectionActionBar() {
       return;
     }
     const allMessages = getAllMessageElements();
-    let successCount = 0;
-    let errorCount = 0;
+    const selectedElements: HTMLElement[] = [];
+    let notFoundCount = 0;
+
     for (const id of selectedMessageIds) {
       const selectedItem = allMessages.find(item => item.id === id);
       if (selectedItem && selectedItem.element) {
-        try {
-          await handleCopyImage(selectedItem.element); // No contentSelectorOverride needed
-          successCount++;
-        } catch (e) {
-          console.error(`Error copying image for item ${id}:`, e);
-          errorCount++;
-        }
+        selectedElements.push(selectedItem.element);
       } else {
-        console.warn(`Could not find element for selected ID (copy image): ${id}`);
-        errorCount++;
+        console.warn(`Could not find element for selected ID (multi-select copy image): ${id}`);
+        notFoundCount++;
       }
     }
-    if (selectedMessageIds.size > 1) {
-      if (successCount > 0 && errorCount === 0) {
-        toast.success(`已为 ${successCount} 个项目复制图片。(剪贴板中为最后一张图片)`);
-      } else if (successCount > 0 && errorCount > 0) {
-        toast.warning(`已为 ${successCount} (共 ${selectedMessageIds.size}) 个项目复制图片，其中 ${errorCount} 个失败。(剪贴板中为最后一张成功复制的图片)`);
-      } else if (errorCount > 0 && successCount === 0) {
-        toast.error(`未能为所有 ${errorCount} 个选定项目复制图片。`);
-      }
+
+    if (selectedElements.length > 0) {
+      await handleCopyMultipleImagesAsSingle(selectedElements);
+    } else if (notFoundCount > 0) {
+      // All selected IDs were invalid or their elements couldn't be found
+      toast.error(`未能找到 ${notFoundCount} 个选定项目的元素以复制图片。`);
     }
-    // If only 1 item, individual toast from handleCopyImage is sufficient.
+    // The handleCopyMultipleImagesAsSingle function will show its own success/error toast.
   };
 
   const multiSelectDownloadImage = async () => {

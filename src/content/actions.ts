@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 import { GEMINI_SELECTORS } from './selectors';
 import { htmlToMarkdown } from '../core/markdownConverter';
-import { generateImageBlob } from '../core/imageGenerator';
+import { generateImageBlob, generateCombinedImageBlob } from '../core/imageGenerator'; // Added generateCombinedImageBlob
 
 // Helper function to trigger download
 export function triggerDownload(blob: Blob, filename: string) {
@@ -277,4 +277,31 @@ export async function handleDownloadImage(
     console.error('Could not find blockRoot for Download Image.');
     toast.error('无法找到内容块', { description: '无法下载图片，请检查控制台。' });
   }
-} 
+}
+
+// Action: Copy Multiple Messages as a Single Image
+export async function handleCopyMultipleImagesAsSingle(elements: HTMLElement[]): Promise<void> {
+  if (!elements || elements.length === 0) {
+    toast.info("未选择任何消息。");
+    return;
+  }
+
+  console.log(`Action started: Copy ${elements.length} messages as a single image.`);
+  const pageTitle = elements.length > 1 ? `Gemini Chat - ${elements.length} Messages` : `Gemini Chat`;
+
+
+  try {
+    // Pass a pageTitle to the generation function
+    const blob = await generateCombinedImageBlob(elements, { pageTitle }); 
+
+    if (blob) {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      toast.success(`${elements.length} 条消息已作为单个图片复制到剪贴板。`);
+    } else {
+      toast.error('图片生成失败', { description: '无法生成合并图片。请检查控制台。' });
+    }
+  } catch (error: any) {
+    console.error('Error during combined image copy:', error);
+    toast.error('复制合并图片时出错', { description: error?.message || '未知错误。' });
+  }
+}
