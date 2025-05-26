@@ -419,22 +419,33 @@ function renderOrUpdateSelectionActionBar() {
       toast.info("未选择任何消息。");
       return;
     }
-    const allMessages = getAllMessageElements();
-    const selectedElements: HTMLElement[] = [];
+    const allMessagesFromDOM = getAllMessageElements(); // Renamed to avoid confusion
+    const messagesForCombinedImage: Array<{ element: HTMLElement; type: 'user' | 'model' }> = [];
     let notFoundCount = 0;
 
     for (const id of selectedMessageIds) {
-      const selectedItem = allMessages.find(item => item.id === id);
+      const selectedItem = allMessagesFromDOM.find(item => item.id === id);
       if (selectedItem && selectedItem.element) {
-        selectedElements.push(selectedItem.element);
+        let messageType: 'user' | 'model' = 'model'; // Default to model
+        // Check if the element or any of its children match the userQuery selector
+        if (selectedItem.element.matches(GEMINI_SELECTORS.userQuery) || selectedItem.element.querySelector(GEMINI_SELECTORS.userQuery)) {
+          messageType = 'user';
+        }
+        // Ensure it's an answer container if not a user query, for more precise 'model' type
+        else if (!(selectedItem.element.matches(GEMINI_SELECTORS.answerContainer) || selectedItem.element.querySelector(GEMINI_SELECTORS.answerContainer))) {
+            // If it's neither a user query nor an answer container, it's ambiguous or a wrapper we might not want.
+            // For now, we'll still default to 'model' but this could be refined.
+            // console.warn(`Ambiguous message type for element ID ${id}, defaulting to 'model'. Element:`, selectedItem.element);
+        }
+        messagesForCombinedImage.push({ element: selectedItem.element, type: messageType });
       } else {
         console.warn(`Could not find element for selected ID (multi-select copy image): ${id}`);
         notFoundCount++;
       }
     }
 
-    if (selectedElements.length > 0) {
-      await handleCopyMultipleImagesAsSingle(selectedElements);
+    if (messagesForCombinedImage.length > 0) {
+      await handleCopyMultipleImagesAsSingle(messagesForCombinedImage);
     } else if (notFoundCount > 0) {
       // All selected IDs were invalid or their elements couldn't be found
       toast.error(`未能找到 ${notFoundCount} 个选定项目的元素以复制图片。`);

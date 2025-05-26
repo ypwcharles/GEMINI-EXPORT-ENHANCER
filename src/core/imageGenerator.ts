@@ -1,5 +1,7 @@
 import html2canvas from 'html2canvas';
 
+const PLACEHOLDER_SVG = 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60" viewBox="0 0 100 60"><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="10px" fill="%23777">Image load error (CORS)</text></svg>';
+
 export interface ImageStyleOptions {
   // Page container options
   pageWidth?: number;
@@ -242,6 +244,7 @@ const INTERFERING_ELEMENT_SELECTORS = [
   'sensitive-memories-banner', // Remove sensitive content banners
   'tts-control',              // Remove text-to-speech controls
   'message-actions',          // Remove the entire message actions bar (thumbs up/down, share, etc.)
+  '.gemini-enhancer-checkbox-wrapper', // Remove multi-select checkboxes
   // Add other selectors if needed
 ];
 
@@ -390,6 +393,12 @@ export async function generateImageBlob(
   });
   console.log('Finished searching for Google User Content images.');
   // --- END: Modify Google User Content Image URLs to Full Size ---
+
+  // --- START: Set crossOrigin and Pre-load Test for all images in cleanedClone ---
+  const imageProcessingPromises = Array.from(imagesInClone).map(img => processImageElement(img));
+  await Promise.allSettled(imageProcessingPromises);
+  console.log('Finished setting crossOrigin and pre-loading tests for images in generateImageBlob.');
+  // --- END: Set crossOrigin and Pre-load Test ---
 
   // The new function applyCanvasFriendlyCodeStyles handles line-height for code blocks,
   // so the loop below is no longer needed and might conflict.
@@ -604,6 +613,45 @@ export async function generateImageBlob(
   });
 }
 
+// Helper function to process individual image elements for CORS and fallback
+async function processImageElement(img: HTMLImageElement): Promise<void> {
+  const originalSrc = img.src;
+  img.crossOrigin = 'anonymous';
+  // console.log('Set crossOrigin="anonymous" for image:', originalSrc); // Log for every image
+
+  if (originalSrc && originalSrc.startsWith('https://lh3.googleusercontent.com/')) {
+    // console.log('Performing pre-load test for Google User Content image:', originalSrc);
+    const testImage = new Image();
+    testImage.crossOrigin = 'anonymous';
+    testImage.src = originalSrc; // Use the (potentially =d modified) src
+
+    try {
+      await new Promise((resolve, reject) => {
+        testImage.onload = resolve;
+        testImage.onerror = (err) => {
+          // Log the specific error object if needed, or just the event itself
+          // console.error('Test image onerror event:', err); 
+          reject(new Error(`Pre-load failed for ${originalSrc}`));
+        };
+      });
+      // If loaded successfully, ensure the img.src reflects the final URL after any redirects.
+      if (img.src !== testImage.src) {
+        // console.log(`Redirect detected or src mismatch for ${originalSrc}. Updated src to: ${testImage.src}`);
+        img.src = testImage.src;
+      }
+      // console.log('Pre-load test successful for:', testImage.src);
+    } catch (e) {
+      console.warn(`CORS pre-load check failed for image: ${originalSrc}. Replacing with placeholder. Error:`, e);
+      img.src = PLACEHOLDER_SVG;
+      img.alt = 'Image failed to load due to security restrictions (CORS or other error)';
+      // Optionally set width/height to maintain layout if placeholder is a different aspect ratio
+      // img.style.width = '100px'; 
+      // img.style.height = '60px';
+    }
+  }
+}
+
+
 /**
  * Generates a single image Blob from multiple HTML elements, combining them into one vertical image.
  *
@@ -612,11 +660,11 @@ export async function generateImageBlob(
  * @returns A Promise that resolves with the image Blob, or null if an error occurs.
  */
 export async function generateCombinedImageBlob(
-  elements: HTMLElement[],
+  messages: Array<{ element: HTMLElement; type: 'user' | 'model' }>, // Updated signature
   options?: Partial<ImageStyleOptions>
 ): Promise<Blob | null> {
-  if (!elements || elements.length === 0) {
-    console.error('No elements provided for combined image generation.');
+  if (!messages || messages.length === 0) { // Updated check
+    console.error('No messages provided for combined image generation.');
     return null;
   }
 
@@ -664,13 +712,15 @@ export async function generateCombinedImageBlob(
   mainCard.style.flexDirection = 'column';
 
   // 2. Message Processing Loop
-  for (let i = 0; i < elements.length; i++) {
-    const originalElement = elements[i];
+  for (let i = 0; i < messages.length; i++) { // Updated loop
+    const item = messages[i];
+    const originalElement = item.element;
+    const messageType = item.type;
     const messageClone = originalElement.cloneNode(true) as HTMLElement;
 
     // 2a. Transfer computed line-height (optional, but good for consistency)
     try {
-      transferComputedLineHeight(originalElement, messageClone);
+      transferComputedLineHeight(originalElement, messageClone); // No change here
     } catch (e) {
       console.warn("Error transferring computed line-height for a message clone:", e);
     }
@@ -689,9 +739,11 @@ export async function generateCombinedImageBlob(
       }
     });
 
-    // 2c. Apply URL Transformation for Google User Content images
-    const imagesInMessageClone = messageClone.querySelectorAll('img');
-    imagesInMessageClone.forEach(img => {
+    // 2c. Apply URL Transformation for Google User Content images & then process with pre-load test
+    const imagesInMessageClone = Array.from(messageClone.querySelectorAll('img'));
+    const currentMessageImageProcessingPromises: Promise<void>[] = [];
+
+    for (const img of imagesInMessageClone) {
       if (img.src && img.src.startsWith('https://lh3.googleusercontent.com/')) {
         try {
           let url = new URL(img.src);
@@ -712,14 +764,21 @@ export async function generateCombinedImageBlob(
               url.search = '';
               const newSrc = url.toString();
               if (img.src !== newSrc) {
+                  // console.log('Original image URL (combined):', img.src);
                   img.src = newSrc;
+                  // console.log('Modified image URL to full size (combined):', img.src);
               }
           }
         } catch (e) {
-          console.error('Error processing image URL for full size in combined image:', img.src, e);
+          console.error('Error processing image URL for full size in combined image message clone:', img.src, e);
         }
       }
-    });
+      // Add the promise from processImageElement to the list for this message clone
+      currentMessageImageProcessingPromises.push(processImageElement(img));
+    }
+    // Wait for all images in the current message clone to be processed (crossOrigin, pre-load)
+    await Promise.allSettled(currentMessageImageProcessingPromises);
+    // console.log(`Finished image processing for message clone ${i}`);
 
     // 2d. Style Code Blocks
     const codeBlocksInMessageClone = messageClone.querySelectorAll<HTMLElement>('div.code-block');
@@ -730,17 +789,48 @@ export async function generateCombinedImageBlob(
     // 2e. Force General Styles (pass 'transparent' and isRoot=false)
     // This aims to style text, etc., without applying a background to the individual messageClone.
     forceStyles(messageClone, 'transparent', false);
-    // Ensure the direct messageClone itself does not have a conflicting background from its original state.
-    messageClone.style.backgroundColor = 'transparent'; 
+    // Ensure the direct messageClone itself does not have a conflicting background from its original state initially.
+    messageClone.style.backgroundColor = 'transparent';
 
 
-    // 2f. Append messageClone to the main card
-    mainCard.appendChild(messageClone);
+    // 2f. Conditional Alignment and Styling & Append to mainCard
+    if (messageType === 'user') {
+      const alignWrapper = document.createElement('div');
+      alignWrapper.style.display = 'flex';
+      alignWrapper.style.justifyContent = 'flex-end';
+      alignWrapper.style.width = '100%';
+      alignWrapper.style.marginBottom = '10px'; // Spacing for the wrapper
+
+      // Style the user message bubble
+      messageClone.style.maxWidth = '85%';
+      messageClone.style.backgroundColor = '#d1eaff'; // Light blue background
+      messageClone.style.padding = '12px';
+      messageClone.style.borderRadius = '16px';
+      messageClone.style.color = '#1c1c1e'; // Darker text
+      messageClone.style.boxSizing = 'border-box';
+      // Ensure any direct text nodes in messageClone also get the user message text color
+      // This is a bit of a heavy-handed way; ideally, text color is inherited or set on specific text elements.
+      // However, user queries are often simple text.
+      messageClone.style.color = '#1c1c1e';
+
+
+      alignWrapper.appendChild(messageClone);
+      mainCard.appendChild(alignWrapper);
+    } else { // Model message
+      // Style model message bubble (optional, or leave as is if it takes card background)
+      messageClone.style.maxWidth = '100%';
+      messageClone.style.marginBottom = '10px'; // Spacing for the block
+      // messageClone.style.backgroundColor = '#f0f0f0'; // Optional distinct background for model messages
+      // messageClone.style.padding = '12px'; // Optional padding
+      // messageClone.style.borderRadius = '16px'; // Optional border radius
+      mainCard.appendChild(messageClone);
+    }
 
     // 2g. Add Separator (if not the last message)
-    if (i < elements.length - 1) {
+    if (i < messages.length - 1) { // Updated loop condition
       const separator = document.createElement('hr');
       separator.style.cssText = 'border: none; border-top: 1px solid #e0e0e0; margin: 15px 0; width: 100%;';
+      // The separator should be a direct child of mainCard, not inside alignWrapper
       mainCard.appendChild(separator);
     }
   }

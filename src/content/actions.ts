@@ -280,23 +280,27 @@ export async function handleDownloadImage(
 }
 
 // Action: Copy Multiple Messages as a Single Image
-export async function handleCopyMultipleImagesAsSingle(elements: HTMLElement[]): Promise<void> {
-  if (!elements || elements.length === 0) {
+export async function handleCopyMultipleImagesAsSingle(
+  messages: Array<{ element: HTMLElement; type: 'user' | 'model' }>
+): Promise<void> {
+  if (!messages || messages.length === 0) {
     toast.info("未选择任何消息。");
     return;
   }
 
-  console.log(`Action started: Copy ${elements.length} messages as a single image.`);
-  const pageTitle = elements.length > 1 ? `Gemini Chat - ${elements.length} Messages` : `Gemini Chat`;
+  console.log(`Action started: Copy ${messages.length} messages as a single image. Message types:`, messages.map(m => m.type));
+  const pageTitle = messages.length > 1 ? `Gemini Chat - ${messages.length} Messages` : `Gemini Chat`;
 
+  // The type information is now used by generateCombinedImageBlob.
+  // const elementsToRender = messages.map(msg => msg.element); // No longer needed
 
   try {
-    // Pass a pageTitle to the generation function
-    const blob = await generateCombinedImageBlob(elements, { pageTitle }); 
+    // Pass the typed messages array and a pageTitle to the generation function.
+    const blob = await generateCombinedImageBlob(messages, { pageTitle }); 
 
     if (blob) {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      toast.success(`${elements.length} 条消息已作为单个图片复制到剪贴板。`);
+      toast.success(`${messages.length} 条消息已作为单个图片复制到剪贴板。`);
     } else {
       toast.error('图片生成失败', { description: '无法生成合并图片。请检查控制台。' });
     }
