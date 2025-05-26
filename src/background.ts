@@ -12,7 +12,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false; // No async response here
     }
 
-    fetch(imageUrl)
+    fetch(imageUrl, { credentials: 'omit' }) // Added { credentials: 'omit' }
       .then(response => {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status} for ${imageUrl}`);
