@@ -341,27 +341,166 @@ function renderOrUpdateSelectionActionBar() {
   // Disable action buttons if selectedCount is 0, but the bar itself is visible.
   const areAllSelected = selectedMessageIds.size > 0 && allMessageElements.length > 0 && allMessageElements.every(el => selectedMessageIds.has(el.id));
 
-  const placeholderAction = (actionName: string) => {
-    console.log(`Action bar: ${actionName} clicked for ${selectedMessageIds.size} items.`);
-    toast.info(`Action: ${actionName} for ${selectedMessageIds.size} items (Not implemented yet).`);
+  // --- START: New Action Handlers for Multi-Select ---
+
+  const multiSelectCopyMarkdown = async () => {
+    if (selectedMessageIds.size === 0) {
+      toast.info("未选择任何消息。");
+      return;
+    }
+    const allMessages = getAllMessageElements();
+    let successCount = 0;
+    let errorCount = 0;
+    for (const id of selectedMessageIds) {
+      const selectedItem = allMessages.find(item => item.id === id);
+      if (selectedItem && selectedItem.element) {
+        try {
+          await handleCopyMarkdown(selectedItem.element); // No contentSelectorOverride needed
+          successCount++;
+        } catch (e) {
+          console.error(`Error copying markdown for item ${id}:`, e);
+          errorCount++;
+        }
+      } else {
+        console.warn(`Could not find element for selected ID (copy MD): ${id}`);
+        errorCount++;
+      }
+    }
+    if (selectedMessageIds.size > 1) {
+      if (successCount > 0 && errorCount === 0) {
+        toast.success(`已为 ${successCount} 个项目复制 Markdown。(剪贴板中为最后一个项目)`);
+      } else if (successCount > 0 && errorCount > 0) {
+        toast.warning(`已为 ${successCount} (共 ${selectedMessageIds.size}) 个项目复制 Markdown，其中 ${errorCount} 个失败。(剪贴板中为最后一个成功项目)`);
+      } else if (errorCount > 0 && successCount === 0) {
+        toast.error(`未能为所有 ${errorCount} 个选定项目复制 Markdown。`);
+      }
+    }
+    // If only 1 item, individual toast from handleCopyMarkdown is sufficient.
   };
+
+  const multiSelectDownloadMarkdown = async () => {
+    if (selectedMessageIds.size === 0) {
+      toast.info("未选择任何消息。");
+      return;
+    }
+    const allMessages = getAllMessageElements();
+    let successCount = 0;
+    let errorCount = 0;
+    for (const id of selectedMessageIds) {
+      const selectedItem = allMessages.find(item => item.id === id);
+      if (selectedItem && selectedItem.element) {
+        try {
+          await handleDownloadMarkdown(selectedItem.element); // No contentSelectorOverride needed
+          successCount++;
+        } catch (e) {
+          console.error(`Error downloading markdown for item ${id}:`, e);
+          errorCount++;
+        }
+      } else {
+        console.warn(`Could not find element for selected ID (download MD): ${id}`);
+        errorCount++;
+      }
+    }
+    if (selectedMessageIds.size > 1) {
+      if (successCount > 0 && errorCount === 0) {
+        toast.success(`已为 ${successCount} 个项目启动 Markdown 下载。`);
+      } else if (successCount > 0 && errorCount > 0) {
+        toast.warning(`已为 ${successCount} (共 ${selectedMessageIds.size}) 个项目启动 Markdown 下载，其中 ${errorCount} 个失败。`);
+      } else if (errorCount > 0 && successCount === 0) {
+        toast.error(`未能为所有 ${errorCount} 个选定项目启动 Markdown 下载。`);
+      }
+    }
+    // If only 1 item, individual toast from handleDownloadMarkdown is sufficient.
+  };
+
+  const multiSelectCopyImage = async () => {
+    if (selectedMessageIds.size === 0) {
+      toast.info("未选择任何消息。");
+      return;
+    }
+    const allMessages = getAllMessageElements();
+    let successCount = 0;
+    let errorCount = 0;
+    for (const id of selectedMessageIds) {
+      const selectedItem = allMessages.find(item => item.id === id);
+      if (selectedItem && selectedItem.element) {
+        try {
+          await handleCopyImage(selectedItem.element); // No contentSelectorOverride needed
+          successCount++;
+        } catch (e) {
+          console.error(`Error copying image for item ${id}:`, e);
+          errorCount++;
+        }
+      } else {
+        console.warn(`Could not find element for selected ID (copy image): ${id}`);
+        errorCount++;
+      }
+    }
+    if (selectedMessageIds.size > 1) {
+      if (successCount > 0 && errorCount === 0) {
+        toast.success(`已为 ${successCount} 个项目复制图片。(剪贴板中为最后一张图片)`);
+      } else if (successCount > 0 && errorCount > 0) {
+        toast.warning(`已为 ${successCount} (共 ${selectedMessageIds.size}) 个项目复制图片，其中 ${errorCount} 个失败。(剪贴板中为最后一张成功复制的图片)`);
+      } else if (errorCount > 0 && successCount === 0) {
+        toast.error(`未能为所有 ${errorCount} 个选定项目复制图片。`);
+      }
+    }
+    // If only 1 item, individual toast from handleCopyImage is sufficient.
+  };
+
+  const multiSelectDownloadImage = async () => {
+    if (selectedMessageIds.size === 0) {
+      toast.info("未选择任何消息。");
+      return;
+    }
+    const allMessages = getAllMessageElements();
+    let successCount = 0;
+    let errorCount = 0;
+    for (const id of selectedMessageIds) {
+      const selectedItem = allMessages.find(item => item.id === id);
+      if (selectedItem && selectedItem.element) {
+        try {
+          await handleDownloadImage(selectedItem.element); // No contentSelectorOverride needed
+          successCount++;
+        } catch (e) {
+          console.error(`Error downloading image for item ${id}:`, e);
+          errorCount++;
+        }
+      } else {
+        console.warn(`Could not find element for selected ID (download image): ${id}`);
+        errorCount++;
+      }
+    }
+    if (selectedMessageIds.size > 1) {
+      if (successCount > 0 && errorCount === 0) {
+        toast.success(`已为 ${successCount} 个项目启动图片下载。`);
+      } else if (successCount > 0 && errorCount > 0) {
+        toast.warning(`已为 ${successCount} (共 ${selectedMessageIds.size}) 个项目启动图片下载，其中 ${errorCount} 个失败。`);
+      } else if (errorCount > 0 && successCount === 0) {
+        toast.error(`未能为所有 ${errorCount} 个选定项目启动图片下载。`);
+      }
+    }
+    // If only 1 item, individual toast from handleDownloadImage is sufficient.
+  };
+
+  // --- END: New Action Handlers for Multi-Select ---
 
   // Ensure the component is rendered or updated
   actionBarRoot?.render(
     <React.StrictMode>
       <SelectionActionBar
         selectedCount={selectedMessageIds.size}
-        onCopyImage={() => placeholderAction('Copy Image')}
-        onDownloadImage={() => placeholderAction('Download Image')}
-        onCopyMarkdown={() => placeholderAction('Copy Markdown')}
-        onDownloadMarkdown={() => placeholderAction('Download Markdown')}
+        onCopyImage={multiSelectCopyImage}
+        onDownloadImage={multiSelectDownloadImage}
+        onCopyMarkdown={multiSelectCopyMarkdown}
+        onDownloadMarkdown={multiSelectDownloadMarkdown}
         onToggleSelectAll={() => handleSelectAll(!areAllSelected)}
         areAllSelected={areAllSelected}
         onClose={toggleMultiSelectMode} 
       />
     </React.StrictMode>
   );
-  console.log('SelectionActionBar rendered/updated above input area.');
+  console.log('SelectionActionBar rendered/updated above input area with connected actions.');
 }
 
 function getUniqueBlockId(block: Element, index: number): string {
