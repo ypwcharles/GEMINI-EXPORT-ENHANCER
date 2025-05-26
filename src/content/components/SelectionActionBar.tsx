@@ -75,8 +75,8 @@ const SelectionActionBar: React.FC<SelectionActionBarProps> = ({
   return (
     <div 
       ref={actionBarRef}
-      // Main Container: Apply bg-card and text-card-foreground
-      className="rounded-lg p-3 bg-card text-card-foreground flex items-center justify-between w-full"
+      // Main Container: Apply bg-background and text-foreground for opacity
+      className="rounded-lg p-3 bg-background text-foreground flex items-center justify-between w-full"
       id="gemini-enhancer-selection-action-bar-shadcn"
       // Removed inline style object
     >
