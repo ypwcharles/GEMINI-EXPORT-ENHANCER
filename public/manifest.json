@@ -8,7 +8,9 @@
     "activeTab",
     "scripting",
     "clipboardWrite",
-    "downloads"
+    "downloads",
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback"
   ],
   "host_permissions": [
     "*://gemini.google.com/*",
@@ -42,7 +44,8 @@
       "resources": [
         "assets/*",
         "js/editor.js",
-        "css/editor.css"
+        "css/editor.css",
+        "dnr_rules.json"
       ],
       "matches": ["*://gemini.google.com/*"]
     }
