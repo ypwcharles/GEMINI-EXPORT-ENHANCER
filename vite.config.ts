@@ -14,6 +14,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         content: resolve(__dirname, 'src/content/content.tsx'),
+        background: resolve(__dirname, 'src/background.ts'), // Added line
         // editor: resolve(__dirname, 'src/editor/main.tsx'), // Example: if editor is a separate page bundle
         // popup: resolve(__dirname, 'src/popup/popup.html'), // Example: if using a popup
       },
@@ -21,6 +22,9 @@ export default defineConfig({
         entryFileNames: (chunkInfo) => {
           if (chunkInfo.name === 'content') {
             return 'js/content.js';
+          }
+          if (chunkInfo.name === 'background') { // Added condition
+            return 'js/background.js';          // Fixed output name
           }
           return 'js/[name]-[hash].js';
         },
