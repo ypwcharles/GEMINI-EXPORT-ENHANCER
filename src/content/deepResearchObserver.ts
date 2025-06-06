@@ -2,32 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { toast } from 'sonner';
 import { GEMINI_SELECTORS } from './selectors';
-import { MENU_ITEMS_CONFIG } from './menuConfig'; // Assuming menuConfig.ts is in the same directory
-import { getLocalizedLabel } from './localization'; // Import from localization.ts
-import { 
-  handleCopyMarkdown,
-  handleDownloadMarkdown,
-  handleCopyImage,
-  handleDownloadImage
-} from './actions'; // Assuming actions.ts is in the same directory
-
-// This function will be imported from content.tsx after modification
-// For now, let's declare a type for it to avoid TS errors here.
-type AddCustomMenuItemsFunc = (
-  menuPanel: HTMLElement,
-  answerBlockRoot: HTMLElement,
-  contentSelectorForActions?: string,
-  closeMenuCallback?: () => void
-) => void;
-
-let addCustomMenuItems: AddCustomMenuItemsFunc = () => {
-    console.error("addCustomMenuItems not implemented or imported yet from content.tsx");
-};
-
-// Function to allow content.tsx to set the actual addCustomMenuItems function
-export function setAddCustomMenuItemsUtility(fn: AddCustomMenuItemsFunc) {
-    addCustomMenuItems = fn;
-}
+import { addCustomMenuItems } from './menuUtils'
 
 // --- State for Deep Research Panel ---
 let injectedDeepResearchTriggerButton: HTMLElement | null = null;
@@ -118,10 +93,12 @@ function handleDeepResearchExportButtonClick(event: MouseEvent, triggerButton: H
 
   addCustomMenuItems(
     activeDeepResearchMenuPanel,
-    pseudoAnswerBlock.parentElement || pseudoAnswerBlock as HTMLElement, 
-    contentSelectorForActions, // Pass the selector that actually worked
-    closeDeepResearchMenu // Pass the specific close function for this menu
-  );
+    (pseudoAnswerBlock.parentElement || pseudoAnswerBlock) as HTMLElement,
+    {
+      contentSelectorForActions,
+      closeMenuCallback: closeDeepResearchMenu,
+    }
+  )
 
   setTimeout(() => { 
     document.addEventListener('click', handleClickOutsideDeepResearchMenu, { once: true, capture: true });

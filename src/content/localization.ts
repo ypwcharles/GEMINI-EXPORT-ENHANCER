@@ -18,6 +18,14 @@ export const S_MENU_ITEM_LABELS = {
     zh: '下载为 Markdown',
     en: 'Download as Markdown',
   },
+  selectMultipleMessages: {
+    zh: '选择多条信息分享',
+    en: 'Select Multiple Messages',
+  },
+  cancelSelection: {
+    zh: '取消多选',
+    en: 'Cancel Selection',
+  },
 };
 
 // Helper function to get the localized label

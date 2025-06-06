@@ -31,7 +31,10 @@ import {
 } from './actions';
 
 // Import from the new observer file
-import { initializeDeepResearchObserver, setAddCustomMenuItemsUtility } from './deepResearchObserver';
+import { initializeDeepResearchObserver } from './deepResearchObserver';
+import { addCustomMenuItems } from './menuUtils'
+import { getLocalizedLabel, S_MENU_ITEM_LABELS } from './localization'
+import { debounce } from '@/lib/utils'
 
 import MessageCheckbox from './components/MessageCheckbox';
 import SelectionActionBar from './components/SelectionActionBar';
@@ -73,81 +76,14 @@ if (!document.getElementById('gemini-enhancer-toaster-container')) {
 // Old showToast function is replaced by direct calls to sonner's toast()
 // const showToast = (message: string, type: 'success' | 'error' | 'info') => { ... };
 
-// Helper function to trigger download
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const downloadLink = document.createElement('a');
-  downloadLink.href = url;
-  downloadLink.download = filename;
 
-  document.body.appendChild(downloadLink);
-  try {
-    downloadLink.click();
-    console.log(`Download triggered for ${filename}`);
-  } catch (e) {
-    console.error('Error triggering download click:', e);
-    // Fallback or inform user
-    alert('自动下载失败，请检查浏览器设置或手动操作。');
-  }
-  document.body.removeChild(downloadLink);
-
-  // Revoke the object URL after a delay
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
-}
-
-// Define localized strings for menu items (used locally in this file for getLocalizedLabel)
-const S_MENU_ITEM_LABELS_CONTENT_SCRIPT = {
-  copyImage: {
-    zh: '复制为图片',
-    en: 'Copy as Image',
-  },
-  downloadImage: {
-    zh: '下载为图片',
-    en: 'Download as Image',
-  },
-  copyMarkdown: {
-    zh: '复制为 Markdown',
-    en: 'Copy as Markdown',
-  },
-  downloadMarkdown: {
-    zh: '下载为 Markdown',
-    en: 'Download as Markdown',
-  },
-  selectMultipleMessages: { // Added for multi-select
-    zh: '选择多条信息分享',
-    en: 'Select Multiple Messages',
-  },
-  cancelSelection: { // New label for cancelling multi-select
-    zh: '取消多选',
-    en: 'Cancel Selection',
-  },
-} as const;
-
-// Helper function to get the localized label - EXPORT this function
-export function getLocalizedLabel(actionKey: keyof typeof S_MENU_ITEM_LABELS_CONTENT_SCRIPT, pageLang: string): string {
-  const lang = pageLang.toLowerCase().startsWith('zh') ? 'zh' : 'en';
-  const labels = S_MENU_ITEM_LABELS_CONTENT_SCRIPT[actionKey];
-  return labels[lang] || labels['en']; 
-}
 
 // --- Global State for associating click with share menu ---
 let lastClickedAnswerBlockRoot: HTMLElement | null = null;
 // ---
 
 // --- Debounce helper function ---
-function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
 
-  const debounced = (...args: Parameters<F>) => {
-    if (timeout !== null) {
-      clearTimeout(timeout);
-      timeout = null;
-    }
-    timeout = setTimeout(() => func(...args), waitFor);
-  };
-
-  return debounced as (...args: Parameters<F>) => ReturnType<F>; // Ensure correct typing
-}
 
 // Function to render or update the SelectionActionBar
 function renderOrUpdateSelectionActionBar() {
@@ -692,210 +628,6 @@ function handleSelectAll(selectAll: boolean) {
   renderOrUpdateSelectionActionBar();
 }
 
-// MODIFIED and EXPORTED addCustomMenuItems function
-export function addCustomMenuItems(
-  menuPanel: HTMLElement, 
-  answerBlockRoot: HTMLElement,
-  contentSelectorForActions?: string, // New parameter for specific content selector
-  closeMenuCallback?: () => void // New parameter for custom close callback
-) {
-  if (menuPanel.querySelector('.gemini-enhancer-custom-item')) {
-    console.log("Gemini Export Enhancer: Custom items already exist in this menu panel. Skipping injection.");
-    return;
-  }
-  console.log("Gemini Export Enhancer: Adding custom menu items to panel:", menuPanel, "associated with block:", answerBlockRoot, "selector override:", contentSelectorForActions);
-
-  console.log("Gemini Export Enhancer: MENU_ITEMS_CONFIG received:", JSON.stringify(MENU_ITEMS_CONFIG.map(c => c.id))); // DIAGNOSTIC LOG
-
-  const pageLang = document.documentElement.lang || 'en';
-
-  // Define a more specific type for action handler keys
-  // Exclude 'selectMultipleMessages' and 'cancelSelection' as they don't have direct async actions
-  type ActionHandlerKey = Exclude<keyof typeof S_MENU_ITEM_LABELS_CONTENT_SCRIPT, 'selectMultipleMessages' | 'cancelSelection'>;
-
-  const actionHandlers: { [K in ActionHandlerKey]: (blockRoot: HTMLElement, contentSelector?: string) => Promise<void> } = {
-    copyImage: handleCopyImage,
-    downloadImage: handleDownloadImage,
-    copyMarkdown: handleCopyMarkdown,
-    downloadMarkdown: handleDownloadMarkdown,
-  };
-  const originalFirstChild = menuPanel.firstChild;
-
-  MENU_ITEMS_CONFIG.forEach(itemConfig => {
-    console.log("Gemini Export Enhancer: Processing itemConfig.id:", itemConfig.id); // DIAGNOSTIC LOG
-
-    const button = document.createElement('button');
-    button.setAttribute('role', 'menuitem');
-    button.classList.add('gemini-enhancer-custom-item');
-
-    // Styling (display, align, width, padding, height, textAlign, border, background, cursor, fontSize, fontFamily)
-    button.style.display = 'flex';
-    button.style.alignItems = 'center';
-    button.style.width = '100%';
-    button.style.padding = '0px 16px';
-    button.style.height = '48px';
-    button.style.textAlign = 'left';
-    button.style.border = 'none';
-    button.style.background = 'none';
-    button.style.cursor = 'pointer';
-    button.style.fontSize = '14px';
-    button.style.fontFamily = 'inherit';
-
-    const nativeMenuButton = menuPanel.querySelector('button[mat-menu-item]');
-    // Determine text and icon colors based on theme
-    const isDarkMode = document.documentElement.getAttribute('dark') === 'true' ||
-                       document.documentElement.classList.contains('dark') ||
-                       (window.getComputedStyle(document.body).backgroundColor &&
-                        parseInt(window.getComputedStyle(document.body).backgroundColor.split('(')[1]) < 128);
-
-    let itemTextColor: string;
-    let itemIconColor: string;
-
-    if (isDarkMode) {
-      itemTextColor = 'rgb(232, 234, 237)'; // Light gray for dark mode text
-      itemIconColor = 'rgb(232, 234, 237)'; // Light gray for dark mode icons
-    } else {
-      itemTextColor = nativeMenuButton ? getComputedStyle(nativeMenuButton).color : 'rgb(32, 33, 36)';
-      itemIconColor = 'rgb(32, 33, 36)'; // Dark gray for light mode icons
-    }
-    button.style.color = itemTextColor;
-
-    // Hover effect with Dark Mode detection
-    const lightModeHoverBg = 'rgba(0, 0, 0, 0.04)';
-    const darkModeHoverBg = 'rgba(255, 255, 255, 0.1)';
-    button.onmouseenter = () => {
-        button.style.backgroundColor = isDarkMode ? darkModeHoverBg : lightModeHoverBg;
-    };
-    button.onmouseleave = () => {
-        button.style.backgroundColor = 'transparent';
-    };
-
-    // Create and append Icon
-    const iconContainer = document.createElement('span');
-    iconContainer.style.marginRight = '16px';
-    iconContainer.style.display = 'flex';
-    iconContainer.style.alignItems = 'center';
-    const iconRoot = ReactDOM.createRoot(iconContainer);
-    // Use the dynamically determined itemIconColor
-    iconRoot.render(React.createElement(itemConfig.icon, { style: { width: '20px', height: '20px', color: itemIconColor } }));
-    button.appendChild(iconContainer);
-
-    // Create and append Text (with specific fontWeight and localized label)
-    const textSpan = document.createElement('span');
-    let label: string;
-    if (itemConfig.id === 'selectMultipleMessages') {
-      const labelKey = isMultiSelectModeActive ? 'cancelSelection' : 'selectMultipleMessages';
-      label = getLocalizedLabel(labelKey as keyof typeof S_MENU_ITEM_LABELS_CONTENT_SCRIPT, pageLang);
-    } else {
-      label = getLocalizedLabel(itemConfig.id as keyof typeof S_MENU_ITEM_LABELS_CONTENT_SCRIPT, pageLang);
-    }
-    console.log(`Gemini Export Enhancer: Label for ${itemConfig.id}: ${label}`); // DIAGNOSTIC LOG
-    textSpan.textContent = label;
-    const nativeMenuItemText = menuPanel.querySelector('button[mat-menu-item] span.mat-mdc-menu-item-text');
-    if (nativeMenuItemText) {
-      textSpan.style.fontWeight = getComputedStyle(nativeMenuItemText as HTMLElement).fontWeight;
-    } else {
-      textSpan.style.fontWeight = '500';
-    }
-    button.appendChild(textSpan);
-
-    button.onclick = async (e) => {
-      console.log(`Gemini Export Enhancer: Custom button '${textSpan.textContent}' CLICKED. Selector for action: ${contentSelectorForActions}`);
-      e.stopPropagation();
-      e.preventDefault();
-
-      if (itemConfig.id === 'selectMultipleMessages') {
-        toggleMultiSelectMode(); // Call the global toggle function
-        
-        toast.info(`多选模式已${isMultiSelectModeActive ? '开启' : '关闭'}`);
-
-        if (closeMenuCallback) {
-          setTimeout(closeMenuCallback, 100);
-        } else {
-          // Default close logic for native share menu
-          setTimeout(() => {
-            const nativeMenuPanelToClose = document.querySelector(GEMINI_SELECTORS.shareMenu.menuPanel) as HTMLElement;
-            if (nativeMenuPanelToClose && nativeMenuPanelToClose === menuPanel && nativeMenuPanelToClose.offsetParent !== null) {
-              try {
-                const cdkBackdrop = document.querySelector('.cdk-overlay-backdrop');
-                if (cdkBackdrop && cdkBackdrop instanceof HTMLElement) { cdkBackdrop.click(); return; }
-                document.body.click();
-              } catch (closeError) { console.error("Error attempting to close native menu panel:", closeError); }
-            }
-          }, 100);
-        }
-      } else {
-        // At this point, itemConfig.id is one of the ActionHandlerKey types
-        const actionKey = itemConfig.id as ActionHandlerKey;
-        const actionToPerform = actionHandlers[actionKey];
-        
-        if (!actionToPerform) {
-          console.error(`Gemini Export Enhancer: No action handler found for ID (this should not happen): ${itemConfig.id}`);
-          toast.error('操作失败', { description: `内部错误：未找到操作 ${itemConfig.id} 的处理器。` });
-          return;
-        }
-
-        const currentAnswerBlockRoot = answerBlockRoot;
-        if (!currentAnswerBlockRoot) {
-          console.error("Gemini Export Enhancer: Cannot perform action, associated answer block is missing.");
-          toast.error('操作失败', { description: '无法关联到对应的回答块。' });
-          return;
-        }
-        try {
-          await actionToPerform(currentAnswerBlockRoot, contentSelectorForActions);
-        } catch (error) {
-          console.error(`Gemini Export Enhancer: Error executing ${itemConfig.id}:`, error);
-          toast.error('操作失败', { description: '执行操作时发生未知错误。' });
-        }
-
-        if (closeMenuCallback) {
-          setTimeout(closeMenuCallback, 100);
-        } else {
-          // Default close logic for native share menu
-          setTimeout(() => {
-            const nativeMenuPanelToClose = document.querySelector(GEMINI_SELECTORS.shareMenu.menuPanel) as HTMLElement;
-            if (nativeMenuPanelToClose && nativeMenuPanelToClose === menuPanel && nativeMenuPanelToClose.offsetParent !== null) {
-              try {
-                const cdkBackdrop = document.querySelector('.cdk-overlay-backdrop');
-                if (cdkBackdrop && cdkBackdrop instanceof HTMLElement) { cdkBackdrop.click(); return; }
-                document.body.click();
-              } catch (closeError) { console.error("Error attempting to close native menu panel:", closeError); }
-            }
-          }, 100);
-        }
-      }
-    };
-
-    menuPanel.prepend(button);
-  });
-
-  // Add Divider after all custom items
-  const customItems = menuPanel.querySelectorAll('.gemini-enhancer-custom-item');
-  const lastPrependedItem = customItems[customItems.length - 1]; // This should be correct after removing the extra button
-  if (lastPrependedItem && lastPrependedItem.nextSibling) {
-      if (!(lastPrependedItem.nextSibling instanceof HTMLElement && lastPrependedItem.nextSibling.tagName.toLowerCase() === 'mat-divider')) {
-            const newDivider = document.createElement('mat-divider');
-            newDivider.setAttribute('role', 'separator');
-            newDivider.style.borderTop = '1px solid rgba(0,0,0,0.12)'; // TODO: Use theme variable
-            newDivider.style.margin = '8px 0';
-            menuPanel.insertBefore(newDivider, lastPrependedItem.nextSibling);
-      }
-  } else if (lastPrependedItem && !lastPrependedItem.nextSibling && originalFirstChild) { // If custom items are the only ones
-       const newDivider = document.createElement('mat-divider');
-        newDivider.setAttribute('role', 'separator');
-        newDivider.style.borderTop = '1px solid rgba(0,0,0,0.12)'; // TODO: Use theme variable
-        newDivider.style.margin = '8px 0';
-        menuPanel.appendChild(newDivider); // Append if no original items followed
-  }
-
-  // REMOVE THE REDUNDANT STANDALONE "Select Multiple Messages" button logic from here
-  // const multiSelectButton = document.createElement('button'); ...
-  // ... all the way to ...
-  // console.log("Gemini Export Enhancer: 'Select Multiple' button added to menu panel.");
-}
-
-// Provide the modified addCustomMenuItems to the observer module
-setAddCustomMenuItemsUtility(addCustomMenuItems);
 
 // --- Global Click Listener for regular share menu (remains largely the same) ---
 document.addEventListener('click', (event) => {
@@ -958,8 +690,11 @@ const mainShareMenuObserver = new MutationObserver((mutationsList) => {
             
             if (expectedTriggerButton && expectedTriggerButton.getAttribute('data-gemini-enhancer-triggered-menu') === 'true') {
               console.log("Gemini Export Enhancer: Valid trigger for native share menu panel confirmed.");
-              // Call addCustomMenuItems WITHOUT contentSelectorForActions and WITHOUT closeMenuCallback for native share menu
-              addCustomMenuItems(menuPanelToProcess, lastClickedAnswerBlockRoot);
+              // Inject custom items into the native share menu
+              addCustomMenuItems(menuPanelToProcess, lastClickedAnswerBlockRoot, {
+                isMultiSelectActive: isMultiSelectModeActive,
+                toggleMultiSelectMode,
+              });
               expectedTriggerButton.removeAttribute('data-gemini-enhancer-triggered-menu'); 
             } 
           } 
